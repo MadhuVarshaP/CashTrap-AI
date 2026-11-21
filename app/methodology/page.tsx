@@ -1,15 +1,67 @@
 "use client";
 
-import { ArrowRight, Calculator, FileInput, FileText, Gauge, ShieldAlert } from "lucide-react";
+import clsx from "clsx";
+import { AnimatePresence, motion } from "framer-motion";
+import { Calculator, Check, ChevronLeft, ChevronRight, FileInput, FileText, Gauge, ShieldAlert } from "lucide-react";
+import { useState } from "react";
 import { Card, CardHead, PageTitle, Pill } from "@/components/shared/ui";
 
 const FLOW = [
-  { i: FileInput, t: "Ingest", d: "CSV / Excel statements, validated and unit-normalised." },
-  { i: Calculator, t: "Calculate", d: "DSO · DIO · DPO · CCC, cash conversion, leverage." },
-  { i: Gauge, t: "Score", d: "Five pillars, 18 indicators → 0–100 screening score." },
-  { i: ShieldAlert, t: "Detect", d: "Seven anomaly rules with evidence." },
-  { i: FileText, t: "Explain", d: "Narrative uses engine figures only." },
+  { i: FileInput, t: "Ingest", d: "CSV / Excel statements, validated and unit-normalised.", more: "What happens to your file", points: ["Reads flat tables, Income Statement + Balance Sheet workbooks and S&P Capital IQ exports.", "Matches columns and rows by name; units (AED, thousands, millions) are normalised to AED millions.", "Blank or non-numeric cells become “missing”, never zero, and are listed on screen.", "At least two years are required; five MB maximum."], out: "Validated records + a data-quality report" },
+  { i: Calculator, t: "Calculate", d: "DSO · DIO · DPO · CCC, cash conversion, leverage.", more: "What is computed", points: ["Average-balance DSO, DIO and DPO, and the cash conversion cycle.", "EBITDA-to-cash conversion, free cash flow, net debt and net debt / EBITDA.", "Interest cover, debt service cover, liquidity ratios and operating working capital.", "Every figure is traceable to the formulas in the calculation reference."], out: "Per-year metrics, all in AED millions" },
+  { i: Gauge, t: "Score", d: "Five pillars, 18 indicators → 0–100 screening score.", more: "How the score is built", points: ["Five weighted pillars: earnings quality, cash flow, working capital, debt, liquidity.", "Each indicator is rated Low, Moderate, High or Critical against a stated threshold.", "Indicators without data are not assessed; they never count as zero risk.", "Score = points earned ÷ points assessable, with coverage always shown."], out: "Score /100, pillar points and coverage" },
+  { i: ShieldAlert, t: "Detect", d: "Seven anomaly rules with evidence.", more: "What is flagged", points: ["Receivables or inventory growing faster than revenue.", "EBITDA rising while operating cash flow falls.", "Rising DSO, DIO or cash conversion cycle, and high net debt / EBITDA.", "Each alert shows previous vs current values and what to investigate, never a claim of fraud."], out: "Ranked alerts with severity and evidence" },
+  { i: FileText, t: "Explain", d: "Narrative uses engine figures only.", more: "How findings are written", points: ["Text is built only from calculated figures; nothing is invented.", "Facts, estimates, assumptions, missing data and hypotheses are labelled separately.", "Risks are ordered by materiality and sized in AED wherever the data allows.", "No buy or reject recommendation is ever made."], out: "Investment findings and the due diligence report" },
 ];
+
+function HowItWorks() {
+  const [step, setStep] = useState(0);
+  const f = FLOW[step];
+  const go = (n: number) => setStep((n + FLOW.length) % FLOW.length);
+  return (
+    <div>
+      <div role="tablist" aria-label="Analysis steps" className="relative grid gap-2 md:grid-cols-5 md:gap-3" onKeyDown={(e) => { if (e.key === "ArrowRight") go(step + 1); if (e.key === "ArrowLeft") go(step - 1); }}>
+        {/* connector behind the steps (desktop) */}
+        <div aria-hidden className="absolute left-[10%] right-[10%] top-[34px] hidden h-px bg-line md:block">
+          <motion.div className="h-full bg-accent" initial={false} animate={{ width: `${(step / (FLOW.length - 1)) * 100}%` }} transition={{ type: "spring", stiffness: 160, damping: 24 }} />
+        </div>
+        {FLOW.map((x, n) => {
+          const done = n < step, on = n === step;
+          return (
+            <button key={x.t} role="tab" aria-selected={on} tabIndex={on ? 0 : -1} onClick={() => setStep(n)} className={clsx("tap group relative flex items-center gap-3 rounded-2xl border p-3.5 text-left md:flex-col md:gap-0 md:p-4 md:text-center", on ? "border-accent/60 bg-accent/[0.08] shadow-[0_10px_30px_-14px_rgba(57,136,245,.8)]" : "border-line bg-bg2 hover:border-[#3f4551]")}>
+              <span className={clsx("relative z-10 grid h-11 w-11 shrink-0 place-items-center rounded-xl border transition-colors md:mb-3", on ? "border-accent bg-accent text-white" : done ? "border-accent/40 bg-accent/15 text-accent" : "border-line bg-elev text-ink2 group-hover:text-accent")}>
+                {done ? <Check size={18} /> : <x.i size={18} />}
+              </span>
+              <span className="min-w-0 flex-1 md:flex-none">
+                <span className="block font-mono text-[10px] uppercase tracking-wider text-ink3">Step 0{n + 1}</span>
+                <span className="block text-[14px] font-medium">{x.t}</span>
+                <span className="mt-1 hidden text-[11.5px] leading-snug text-ink3 md:block">{x.d}</span>
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
+      <AnimatePresence mode="wait">
+        <motion.div key={step} role="tabpanel" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.2 }} className="mt-4 grid gap-5 rounded-2xl border border-line bg-bg2 p-5 md:grid-cols-[1fr_260px] md:p-6">
+          <div>
+            <div className="font-mono text-[10px] uppercase tracking-wider text-accent">{f.more}</div>
+            <p className="mt-1 text-[12.5px] text-ink3 md:hidden">{f.d}</p>
+            <ul className="mt-3 space-y-2.5">{f.points.map((t) => <li key={t} className="flex gap-2.5 text-[13px] leading-relaxed text-ink2"><Check size={14} className="mt-1 shrink-0 text-accent" />{t}</li>)}</ul>
+          </div>
+          <div className="flex flex-col justify-between gap-4 rounded-xl border border-line bg-card p-4">
+            <div><div className="font-mono text-[10px] uppercase tracking-wider text-ink3">Produces</div><p className="mt-1.5 text-[13.5px] font-medium leading-snug">{f.out}</p></div>
+            <div className="flex items-center justify-between gap-2">
+              <button onClick={() => go(step - 1)} aria-label="Previous step" className="tap grid h-9 w-9 place-items-center rounded-lg border border-line text-ink2 hover:border-accent/50 hover:text-ink"><ChevronLeft size={16} /></button>
+              <div className="flex gap-1.5" aria-hidden>{FLOW.map((_, n) => <span key={n} className={clsx("h-1.5 rounded-full transition-all", n === step ? "w-5 bg-accent" : "w-1.5 bg-line")} />)}</div>
+              <button onClick={() => go(step + 1)} aria-label="Next step" className="tap grid h-9 w-9 place-items-center rounded-lg border border-line text-ink2 hover:border-accent/50 hover:text-ink"><ChevronRight size={16} /></button>
+            </div>
+          </div>
+        </motion.div>
+      </AnimatePresence>
+    </div>
+  );
+}
 
 const METRICS = [
   ["DSO", "Average Receivables ÷ Revenue × 365", "Days to collect from customers"],
@@ -56,12 +108,12 @@ const BANDS = [
 export default function Methodology() {
   return (
     <>
-      <PageTitle title="Methodology" sub="How CashTrap AI turns financial statements into a transparent, auditable screening view." right={<Pill tone="ai">Decision support · not a verdict</Pill>} />
+      <PageTitle title="Methodology" sub="How CashCop AI turns financial statements into a transparent, auditable screening view." right={<Pill tone="ai">Decision support · not a verdict</Pill>} />
       <div className="grid gap-5 xl:grid-cols-12">
         <Card className="xl:col-span-7">
           <CardHead title="The problem" />
           <p className="font-display text-[24px] font-semibold leading-snug tracking-tight sm:text-[30px]">Profit is an opinion. <span className="text-ink2">Cash is a fact.</span></p>
-          <p className="mt-4 max-w-2xl text-[14px] leading-relaxed text-ink2">A business can report rising EBITDA while customers pay later, stock piles up and operating cash flow falls. Acquirers who only read the income statement can overpay for earnings that never turn into cash. CashTrap AI surfaces these <em>cash traps</em> early, so the investment team knows where to dig.</p>
+          <p className="mt-4 max-w-2xl text-[14px] leading-relaxed text-ink2">A business can report rising EBITDA while customers pay later, stock piles up and operating cash flow falls. Acquirers who only read the income statement can overpay for earnings that never turn into cash. CashCop AI surfaces these <em>cash traps</em> early, so the investment team knows where to dig.</p>
         </Card>
         <Card className="xl:col-span-5">
           <CardHead title="What it is, and isn't" />
@@ -72,16 +124,7 @@ export default function Methodology() {
 
         <Card className="xl:col-span-12">
           <CardHead title="How analysis works" />
-          <div className="grid gap-3 md:grid-cols-5">
-            {FLOW.map((f, i) => (
-              <div key={f.t} className="relative rounded-2xl border border-line bg-bg2 p-4">
-                <div className="mb-3 flex items-center justify-between"><span className="grid h-9 w-9 place-items-center rounded-xl bg-elev text-accent"><f.i size={17} /></span><span className="font-mono text-[11px] text-ink3">0{i + 1}</span></div>
-                <div className="text-[14px] font-medium">{f.t}</div>
-                <p className="mt-1 text-[12px] leading-snug text-ink3">{f.d}</p>
-                {i < FLOW.length - 1 && <ArrowRight size={14} className="absolute -right-2.5 top-1/2 z-10 hidden -translate-y-1/2 text-ink3 md:block" />}
-              </div>
-            ))}
-          </div>
+          <HowItWorks />
         </Card>
 
         <Card className="xl:col-span-7">
