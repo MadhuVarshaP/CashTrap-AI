@@ -94,10 +94,10 @@ export default function Methodology() {
           <CardHead title="Risk-scoring model · 100 points" hint="Prototype screening thresholds, not universal industry standards." />
           <div className="space-y-2.5">
             {MODEL.map(([n, pts, rule]) => (
-              <div key={n} className="grid items-center gap-2 rounded-xl border border-line bg-bg2 p-3.5 md:grid-cols-[230px_1fr_90px] md:gap-5">
+              <div key={n} className="grid items-center gap-2 rounded-xl border border-line bg-bg2 p-3.5 md:grid-cols-[230px_1fr_120px] md:gap-5">
                 <span className="text-[13.5px] font-medium">{n}</span>
                 <span className="font-mono text-[11.5px] text-ink2">{rule}</span>
-                <div className="flex items-center gap-2 md:justify-end"><div className="h-1.5 flex-1 rounded-full bg-elev md:hidden"><div className="h-full rounded-full bg-accent" style={{ width: `${pts * 4}%` }} /></div><span className="font-mono text-[12px] text-accent">{pts} pts</span></div>
+                <div className="flex items-center gap-2 md:justify-end"><div className="h-1.5 flex-1 rounded-full bg-elev md:hidden"><div className="h-full rounded-full bg-accent" style={{ width: `${pts * 4}%` }} /></div><span className="font-mono text-[12px] text-accent">{pts} pts · {pts}%</span></div>
               </div>
             ))}
           </div>

@@ -20,10 +20,12 @@ export default function Assessment() {
 
 function Page({ a }: { a: AnalysisResult }) {
   const { risk } = a;
+  const [unit, setUnit] = useState<"pts" | "pct">("pts");
   const [open, setOpen] = useState<string | null>(risk.categories.slice().sort((x, y) => (y.points ?? 0) / y.max - (x.points ?? 0) / x.max)[0]?.id ?? null);
   const delta = risk.score != null && a.previousScore != null ? risk.score - a.previousScore : null;
   const top = risk.categories.filter((c) => c.points != null && c.points > 0).sort((x, y) => (y.points! / y.max) - (x.points! / x.max) || y.points! - x.points!).slice(0, 3);
   const pie = risk.categories.filter((c) => (c.points ?? 0) > 0).map((c) => ({ name: c.name, value: c.points! }));
+  const weight = (max: number) => (risk.maxEvaluated ? Math.round((max / risk.maxEvaluated) * 1000) / 10 : 0); // effective weight after rescaling for missing indicators
   const fy = (y: number) => `FY${String(y).slice(2)}`;
 
   return (
@@ -46,13 +48,22 @@ function Page({ a }: { a: AnalysisResult }) {
 
         {/* B. breakdown */}
         <Card className="xl:col-span-5">
-          <CardHead title="Risk breakdown" hint="Each bar shows points scored out of the category's weight. Categories without data are shown as not evaluated, never as zero risk." />
+          <CardHead title="Risk breakdown" hint="Weights sum to 100, so points and percent of the total score are the same thing. Each bar shows how much of its own weight a category scored. Categories without data are not evaluated, never counted as zero risk." right={
+            <div role="group" aria-label="Display unit" className="inline-flex rounded-xl border border-line bg-bg2 p-1">
+              {([["pts", "Points"], ["pct", "Percent"]] as const).map(([k, l]) => <button key={k} onClick={() => setUnit(k)} aria-pressed={unit === k} className={clsx("rounded-lg px-3 py-1.5 font-mono text-[11px]", unit === k ? "bg-elev text-ink" : "text-ink3 hover:text-ink2")}>{l}</button>)}
+            </div>
+          } />
           <div className="space-y-4">
             {risk.categories.map((c, i) => (
               <button key={c.id} onClick={() => setOpen(c.id)} className="block w-full text-left">
                 <div className="mb-1.5 flex items-center justify-between gap-3 text-[13px]">
                   <span className="flex items-center gap-2"><span className="h-2 w-2 rounded-sm" style={{ background: PIE[i] }} />{c.name}</span>
-                  {c.points == null ? <span className="font-mono text-[11px] text-ink3">NOT EVALUATED</span> : <span className="font-mono text-[12px] tabular-nums">{c.points}<span className="text-ink3">/{c.max}</span></span>}
+                  {c.points == null ? <span className="font-mono text-[11px] text-ink3">NOT EVALUATED</span> : (
+                    <span className="font-mono text-[12px] tabular-nums">
+                      {unit === "pts" ? <>{c.points}<span className="text-ink3">/{c.max}</span></> : <>{Math.round((c.points / c.max) * 100)}%<span className="text-ink3"> of weight</span></>}
+                      <span className="ml-2 text-ink3">· {weight(c.max)}% wt</span>
+                    </span>
+                  )}
                 </div>
                 {/* segmented bar: weight shown as full track, scored points filled */}
                 <div className="relative">
@@ -62,7 +73,7 @@ function Page({ a }: { a: AnalysisResult }) {
               </button>
             ))}
           </div>
-          <div className="mt-5 flex items-center justify-between border-t border-line pt-4 font-mono text-[11px] text-ink3"><span>TOTAL WEIGHT 100 pts</span><span>0–24 LOW · 25–49 MOD · 50–74 HIGH · 75+ CRIT</span></div>
+          <div className="mt-5 flex items-center justify-between border-t border-line pt-4 font-mono text-[11px] text-ink3"><span>TOTAL WEIGHT 100%{risk.evaluated < risk.total && " (rescaled to evaluated)"}</span><span>0–24 LOW · 25–49 MOD · 50–74 HIGH · 75+ CRIT</span></div>
         </Card>
 
         {/* D. distribution */}
