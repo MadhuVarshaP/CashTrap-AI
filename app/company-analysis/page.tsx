@@ -2,7 +2,7 @@
 
 import clsx from "clsx";
 import { AnimatePresence, motion } from "framer-motion";
-import { AlertTriangle, ArrowUpDown, CheckCircle2, Download, Loader2, Play, Search, Database } from "lucide-react";
+import { AlertTriangle, ArrowUpDown, CheckCircle2, Download, History, Loader2, Play, Search, Database, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { Dropzone } from "@/components/shared/Dropzone";
@@ -20,7 +20,8 @@ const COLS: { key: keyof FinancialRecord; label: string }[] = [
 const UNITS = [{ label: "AED", v: 1 }, { label: "AED thousands", v: 1_000 }, { label: "AED millions", v: 1_000_000 }];
 
 export default function CompanyAnalysis() {
-  const { active, addDataset, updateDataset, setActive, runAnalysis, status, error, analysis, toast } = useApp();
+  const { active, datasets, addDataset, updateDataset, setActive, deleteDataset, history, removeHistory, clearHistory, runAnalysis, status, error, analysis, toast } = useApp();
+  const [confirmDel, setConfirmDel] = useState<string | null>(null);
   const [q, setQ] = useState("");
   const [sort, setSort] = useState<{ k: keyof FinancialRecord; dir: 1 | -1 }>({ k: "year", dir: 1 });
   const dq = dataQuality(active.records);
@@ -52,7 +53,7 @@ export default function CompanyAnalysis() {
         <Card className="xl:col-span-7">
           <CardHead title="Upload financial records" hint="Columns are matched by name; common aliases (Sales, OCF, Total Debt…) are recognised. Blank cells are treated as missing, never zero." />
           <Dropzone onParsed={(records, file, meta) => {
-            addDataset({ id: `upload-${Date.now()}`, name: meta?.name ?? file.name.replace(/\.[^.]+$/, ""), industry: "Uploaded company", synthetic: !!meta?.synthetic, records, unitMultiplier: meta?.unitMultiplier ?? 1_000_000, fileName: file.name });
+            addDataset({ id: `upload-${Date.now()}`, name: meta?.name ?? file.name.replace(/\.[^.]+$/, ""), industry: "Uploaded company", synthetic: !!meta?.synthetic, records, unitMultiplier: meta?.unitMultiplier ?? 1_000_000, fileName: file.name, fileSize: file.size });
             toast(`Loaded ${records.length} years from ${file.name}`, "pos");
           }} />
           <div className="mt-4 flex flex-wrap items-center gap-3">
@@ -153,6 +154,49 @@ export default function CompanyAnalysis() {
             ))}
           </div>
         </Card>
+
+        <Card className="xl:col-span-12">
+          <CardHead icon={<History size={17} className="text-ink3" />} title="Upload history" hint="A log of every file uploaded in this browser. Deleting a company removes its data but keeps the log entry." right={
+            history.some((h) => h.status === "deleted") ? <button onClick={() => { clearHistory(); toast("Cleared deleted entries"); }} className="text-[12px] text-ink3 hover:text-ink">Clear deleted</button> : undefined
+          } />
+          {history.length === 0 ? (
+            <p className="py-6 text-center text-[13px] text-ink3">No uploads yet. Files you upload will be listed here.</p>
+          ) : (
+            <ul className="divide-y divide-line/60">
+              {history.map((h) => {
+                const live = datasets.find((d) => d.id === h.id);
+                const isActive = live && live.id === active.id;
+                return (
+                  <li key={h.id} className="flex flex-col gap-3 py-3.5 sm:flex-row sm:items-center">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className={clsx("truncate text-[14px] font-medium", h.status === "deleted" && "text-ink3 line-through")}>{h.name}</span>
+                        {isActive && <Pill tone="accent">Active</Pill>}
+                        {h.status === "deleted" && <Pill tone="crit">Deleted</Pill>}
+                        {h.analysedAt && h.status === "active" && <Pill tone="pos">Analysed</Pill>}
+                      </div>
+                      <div className="mt-1 font-mono text-[11px] text-ink3">
+                        {h.fileName ?? "—"}{h.fileSize ? ` · ${(h.fileSize / 1024).toFixed(0)} KB` : ""} · {h.period} · {h.rows} yrs · uploaded {new Date(h.uploadedAt).toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" })}
+                        {h.deletedAt && ` · deleted ${new Date(h.deletedAt).toLocaleDateString("en-GB", { dateStyle: "medium" })}`}
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      {live && !isActive && <Button variant="ghost" className="!min-h-[36px]" onClick={() => { setActive(h.id); toast(`Switched to ${h.name}`); }}>Open</Button>}
+                      {live && (confirmDel === h.id ? (
+                        <>
+                          <Button className="!min-h-[36px] !bg-crit hover:!bg-crit/90" onClick={() => { deleteDataset(h.id); setConfirmDel(null); toast(`Deleted ${h.name}`, "warn"); }}>Confirm delete</Button>
+                          <Button variant="ghost" className="!min-h-[36px]" onClick={() => setConfirmDel(null)}>Cancel</Button>
+                        </>
+                      ) : <Button variant="ghost" className="!min-h-[36px] !text-crit" onClick={() => setConfirmDel(h.id)}><Trash2 size={14} /> Delete</Button>)}
+                      {!live && <Button variant="ghost" className="!min-h-[36px]" onClick={() => removeHistory(h.id)}>Remove entry</Button>}
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </Card>
+
       </div>
     </>
   );
