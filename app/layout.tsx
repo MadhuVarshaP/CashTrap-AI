@@ -10,6 +10,7 @@ const mono = JetBrains_Mono({ subsets: ["latin"], variable: "--font-mono" });
 
 export const metadata: Metadata = {
   title: "CashTrap AI — Find the cash traps before you invest",
+  icons: { icon: "/favicon.svg" },
   description: "Financial due diligence for private equity: find the cash traps before you invest.",
 };
 export const viewport: Viewport = { themeColor: "#0A0B0D", width: "device-width", initialScale: 1 };
