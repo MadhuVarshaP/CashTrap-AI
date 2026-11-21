@@ -1,0 +1,21 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html { background: #0A0B0D; color-scheme: dark; }
+body { overflow-x: hidden; font-feature-settings: "tnum" 1, "cv11" 1; }
+.tabular-nums, .font-mono { font-variant-numeric: tabular-nums; }
+::selection { background: rgba(57, 136, 245, .35); }
+* { scrollbar-width: thin; scrollbar-color: #292D35 transparent; }
+input[type="range"] { accent-color: #3988F5; }
+:focus-visible { outline: 2px solid #3988F5; outline-offset: 2px; }
+
+@media print {
+  html, body { background: #fff !important; color: #111 !important; }
+  .print-doc * { color: #111 !important; background: transparent !important; border-color: #ccc !important; }
+  .print-hide { display: none !important; }
+  .print-open > div { display: block !important; height: auto !important; opacity: 1 !important; }
+}
+
+/* let grid children shrink instead of forcing page-level horizontal scroll */
+.grid > * { min-width: 0; }
