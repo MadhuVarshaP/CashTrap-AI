@@ -298,9 +298,7 @@ export function assessRisk(records: FinancialRecord[], metrics: YearMetrics[], i
   const score = insufficient ? null : Math.round((rawPoints / maxEvaluated) * 100);
 
   const warnings: string[] = [];
-  const missing = new Map<string, string[]>();
-  for (const i of out) if (i.points == null) for (const r of i.requires) missing.set(r, [...(missing.get(r) ?? []), i.name]);
-  for (const [need, names] of missing) warnings.push(`${need} not supplied: ${names.join("; ")} not assessed.`);
+  for (const i of out) if (i.points == null) warnings.push(`${i.name} not assessed: needs ${i.requires.join(" and ").toLowerCase()}.`);
   if (c.ebitda != null && (inputs.adjustmentStatus !== "verified" || inputs.ebitdaAdjustment == null)) warnings.push("Adjusted EBITDA equals reported EBITDA: no verified adjustments have been entered.");
   if (metrics.some((m) => m.approximate)) warnings.push("The earliest year uses closing balances only for working-capital days.");
 
