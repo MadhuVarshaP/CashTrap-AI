@@ -1,5 +1,6 @@
 "use client";
 
+import { scaleM } from "@/lib/utilities/format";
 import clsx from "clsx";
 import { Info } from "lucide-react";
 import { motion } from "framer-motion";
@@ -85,7 +86,8 @@ export function PageTitle({ title, sub, right }: { title: string; sub: string; r
 export function Money({ value, decimals = 1, prefix = "AED ", suffix = "m", className }: { value: number | null; decimals?: number; prefix?: string; suffix?: string; className?: string }) {
   const v = useCountUp(value ?? 0);
   if (value == null) return <span className={className}>—</span>;
-  return <span className={clsx("tabular-nums", className)}>{prefix}{v.toLocaleString("en-US", { minimumFractionDigits: decimals, maximumFractionDigits: decimals })}{suffix}</span>;
+  const sc = suffix === "m" ? scaleM(v, decimals) : { n: v.toLocaleString("en-US", { minimumFractionDigits: decimals, maximumFractionDigits: decimals }), unit: suffix };
+  return <span className={clsx("tabular-nums", className)}>{prefix}{sc.n}{sc.unit}</span>;
 }
 
 export function CountNum({ value, decimals = 0, suffix = "", className }: { value: number; decimals?: number; suffix?: string; className?: string }) {

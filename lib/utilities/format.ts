@@ -2,8 +2,18 @@ import type { Num } from "@/types/finance";
 
 export const DASH = "—";
 
-export const fmtM = (v: Num, d = 1): string =>
-  v == null || !isFinite(v) ? DASH : `AED ${v.toLocaleString("en-US", { minimumFractionDigits: d, maximumFractionDigits: d })}m`;
+/** scales AED millions so very large companies stay readable: 10,000m → bn, 1,000,000m → tn */
+export const scaleM = (v: number, d = 1): { n: string; unit: string } => {
+  const a = Math.abs(v);
+  const [x, unit, dd] = a >= 1_000_000 ? [v / 1_000_000, "tn", 2] : a >= 10_000 ? [v / 1_000, "bn", 1] : [v, "m", d];
+  return { n: x.toLocaleString("en-US", { minimumFractionDigits: dd as number, maximumFractionDigits: dd as number }), unit };
+};
+
+export const fmtM = (v: Num, d = 1): string => {
+  if (v == null || !isFinite(v)) return DASH;
+  const { n, unit } = scaleM(v, d);
+  return `AED ${n}${unit}`;
+};
 
 export const fmtNum = (v: Num, d = 1): string =>
   v == null || !isFinite(v) ? DASH : v.toLocaleString("en-US", { minimumFractionDigits: d, maximumFractionDigits: d });
