@@ -38,6 +38,12 @@ Optional: set `NEXT_PUBLIC_API_URL` to route analysis through a FastAPI backend 
 
 No login, payments, portfolio management or market feeds, by design.
 
+## Deploy to Vercel
+
+`vercel.json` pins the framework to Next.js, so no output directory is needed (Next.js serves from `.next`, not `public`).
+If you still see `STATIC_BUILD_NO_OUT_DIR`, open *Project Settings → Build & Development Settings* and set **Framework Preset = Next.js**,
+leaving **Output Directory** empty (not `public`). No environment variables are required for the demo.
+
 ## Pages
 
 | Route | Purpose |
