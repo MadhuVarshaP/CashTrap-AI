@@ -14,7 +14,7 @@ export function Sidebar() {
   const [open, setOpen] = useState(false);
   return (
     <aside className={clsx("sticky top-0 z-30 hidden h-screen shrink-0 flex-col border-r border-line bg-bg2 py-5 transition-[width] duration-300 lg:flex print:hidden", open ? "w-[232px] px-4" : "w-[84px] items-center px-3")}>
-      <Link href="/overview" className={clsx("mb-8 flex items-center gap-3", !open && "justify-center")} aria-label="CashTrap AI home">
+      <Link href="/company-analysis" className={clsx("mb-8 flex items-center gap-3", !open && "justify-center")} aria-label="CashTrap AI home">
         <LogoMark size={32} />
         {open && <Wordmark />}
       </Link>
