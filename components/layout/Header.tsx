@@ -2,7 +2,7 @@
 
 import clsx from "clsx";
 import { AnimatePresence, motion } from "framer-motion";
-import { Bell, BellRing, Building2, Check, ChevronDown, Search, Trash2 } from "lucide-react";
+import { Bell, BellRing, Building2, ChevronDown, Search, Trash2 } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { useApp } from "@/lib/state/store";
@@ -77,10 +77,9 @@ export function Header() {
                           </div>
                         </div>
                       ) : (
-                        <div className="flex items-center gap-1 rounded-xl hover:bg-card">
-                          <button onClick={() => { setActive(d.id); setSel(false); toast(`Switched to ${d.name}`); }} className="flex min-w-0 flex-1 items-center justify-between gap-2 rounded-xl px-3 py-2.5 text-left text-[13px]">
-                            <span className="min-w-0"><span className="block truncate">{d.name}</span><span className="block font-mono text-[10px] text-ink3">{d.id === "gulftech-demo" ? "" : `UPLOADED · ${d.fileName ?? ""}`}</span></span>
-                            {d.id === active.id && <Check size={15} className="shrink-0 text-accent" />}
+                        <div className={clsx("flex items-center gap-1 rounded-xl hover:bg-card", d.id === active.id && "bg-card")}>
+                          <button onClick={() => { setActive(d.id); setSel(false); toast(`Switched to ${d.name}`); }} className={clsx("flex min-w-0 flex-1 items-center rounded-xl px-3 py-2.5 text-left text-[13px]", d.id === active.id ? "text-ink" : "text-ink2")}>
+                            <span className="min-w-0 truncate">{d.name}</span>
                           </button>
                           {d.id !== "gulftech-demo" && (
                             <button onClick={() => setConfirm(d.id)} aria-label={`Delete ${d.name}`} title="Delete this company" className="mr-1 grid h-9 w-9 shrink-0 place-items-center rounded-lg text-ink3 hover:bg-crit/10 hover:text-crit"><Trash2 size={15} /></button>
