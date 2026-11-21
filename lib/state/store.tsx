@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
-import type { AnalysisResult, Dataset, HistoryItem } from "@/types/finance";
+import type { AnalysisResult, AssessmentInputs, Dataset, HistoryItem } from "@/types/finance";
 import { GULFTECH } from "@/lib/demo-data/gulftech";
 import { analyze } from "@/lib/calculations/analyze";
 import { analyzeRemote } from "@/lib/api/client";
@@ -18,6 +18,8 @@ interface Ctx {
   setActive: (id: string) => void;
   addDataset: (d: Dataset) => void;
   updateDataset: (d: Dataset) => void;
+  /** merge investor inputs (adjustments, valuation, stress) and refresh the active company's results in place */
+  updateInputs: (patch: Partial<AssessmentInputs>) => void;
   deleteDataset: (id: string) => void;
   history: HistoryItem[];
   removeHistory: (id: string) => void;
@@ -47,7 +49,7 @@ export const useApp = () => {
 };
 
 const KEY = "cashtrap-ai.v1";
-interface Persisted { uploads: Dataset[]; activeId: string; analysed: string[]; history: HistoryItem[]; notices?: Notice[] }
+interface Persisted { uploads: Dataset[]; activeId: string; analysed: string[]; history: HistoryItem[]; notices?: Notice[]; demoInputs?: AssessmentInputs }
 
 const read = (): Persisted | null => {
   try { const raw = localStorage.getItem(KEY); return raw ? (JSON.parse(raw) as Persisted) : null; } catch { return null; }
@@ -80,13 +82,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const saved = read();
     if (saved) {
       const uploads = saved.uploads.filter((d) => d.id !== GULFTECH.id);
-      const res: Record<string, AnalysisResult | null> = { [GULFTECH.id]: analyze(GULFTECH) };
+      const demo: Dataset = { ...GULFTECH, inputs: saved.demoInputs };
+      const res: Record<string, AnalysisResult | null> = { [GULFTECH.id]: analyze(demo) };
       for (const d of uploads) res[d.id] = saved.analysed.includes(d.id) ? analyze(d) : null;
-      setDatasets([GULFTECH, ...uploads]);
+      setDatasets([demo, ...uploads]);
       setResults(res);
       setHistory(saved.history ?? []);
       setNotices(saved.notices ?? []);
-      const id = [GULFTECH, ...uploads].some((d) => d.id === saved.activeId) ? saved.activeId : GULFTECH.id;
+      const id = [demo, ...uploads].some((d) => d.id === saved.activeId) ? saved.activeId : GULFTECH.id;
       setActiveId(id);
       setStatus(res[id] ? "done" : "idle");
     }
@@ -102,6 +105,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       analysed: Object.entries(results).filter(([id, r]) => r && id !== GULFTECH.id).map(([id]) => id),
       history,
       notices: notices.slice(0, 40),
+      demoInputs: datasets.find((d) => d.id === GULFTECH.id)?.inputs,
     });
   }, [hydrated, datasets, activeId, results, history, notices]);
 
@@ -153,6 +157,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setStatus(d.id === GULFTECH.id ? "done" : "idle");
   }, []);
 
+  const updateInputs = useCallback((patch: Partial<AssessmentInputs>) => {
+    const d = datasets.find((x) => x.id === activeId);
+    if (!d) return;
+    const next: Dataset = { ...d, inputs: { ...d.inputs, ...patch } };
+    setDatasets((all) => all.map((x) => (x.id === d.id ? next : x)));
+    setResults((r) => (r[d.id] ? { ...r, [d.id]: analyze(next) } : r));
+  }, [datasets, activeId]);
+
   const deleteDataset = useCallback((id: string) => {
     if (id === GULFTECH.id) return; // the built-in demo can't be removed
     setDatasets((ds) => ds.filter((d) => d.id !== id));
@@ -187,8 +199,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [active, toast, notify]);
 
   const value = useMemo<Ctx>(
-    () => ({ datasets, active, setActive, addDataset, updateDataset, deleteDataset, history, removeHistory, clearHistory, analysis: results[active.id] ?? null, status, error, runAnalysis, notices, popups, notify, toast, dismissPopup, markAllRead, clearNotices, desktop, enableDesktop }),
-    [datasets, active, setActive, addDataset, updateDataset, deleteDataset, history, removeHistory, clearHistory, results, status, error, runAnalysis, notices, popups, notify, toast, dismissPopup, markAllRead, clearNotices, desktop, enableDesktop]
+    () => ({ datasets, active, setActive, addDataset, updateDataset, updateInputs, deleteDataset, history, removeHistory, clearHistory, analysis: results[active.id] ?? null, status, error, runAnalysis, notices, popups, notify, toast, dismissPopup, markAllRead, clearNotices, desktop, enableDesktop }),
+    [datasets, active, setActive, addDataset, updateDataset, updateInputs, deleteDataset, history, removeHistory, clearHistory, results, status, error, runAnalysis, notices, popups, notify, toast, dismissPopup, markAllRead, clearNotices, desktop, enableDesktop]
   );
   return <C.Provider value={value}>{children}</C.Provider>;
 }

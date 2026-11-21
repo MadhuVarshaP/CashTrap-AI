@@ -1,9 +1,11 @@
 import type { AnalysisResult, Dataset, FieldKey, FinancialRecord } from "@/types/finance";
 import { computeMetrics } from "./metrics";
-import { scoreRisk } from "./risk";
+import { assessRisk } from "./pe-risk";
 import { detectAlerts } from "./alerts";
 
 const FIELDS: FieldKey[] = ["revenue", "cogs", "ebitda", "receivables", "inventory", "payables", "operatingCashFlow", "cash", "debt"];
+
+const MONEY_OPTIONAL = ["capex", "interestExpense", "currentAssets", "currentLiabilities", "principalRepayment", "shortTermDebt"] as const;
 
 export function scaleRecords(rs: FinancialRecord[], multiplier: number): FinancialRecord[] {
   const k = multiplier / 1_000_000;
@@ -15,6 +17,7 @@ export function scaleRecords(rs: FinancialRecord[], multiplier: number): Financi
       const sc = (v: number | null | undefined) => (v == null ? null : v * k);
       if (r.creditSales !== undefined) o.creditSales = sc(r.creditSales);
       if (r.creditPurchases !== undefined) o.creditPurchases = sc(r.creditPurchases);
+      for (const f of MONEY_OPTIONAL) if (r[f] !== undefined) o[f] = sc(r[f] as number | null);
       if (r.opening) o.opening = { receivables: sc(r.opening.receivables), inventory: sc(r.opening.inventory), payables: sc(r.opening.payables) };
       return o;
     });
@@ -29,10 +32,13 @@ export function analyze(ds: Dataset): AnalysisResult | null {
   const latest = metrics[n - 1], previous = metrics[n - 2];
   const latestRecord = records[n - 1], previousRecord = records[n - 2];
   const missingFields = records.flatMap((r) => FIELDS.filter((f) => r[f] == null).map((f) => `${f} (${r.year})`));
-  const prior = n >= 3 ? scoreRisk({ cur: metrics[n - 2], prev: metrics[n - 3], curR: records[n - 2], prevR: records[n - 3] }) : null;
+  const inputs = ds.inputs ?? {};
+  // prior-year score on the same rules, without this year's adjustment input (which applies to the latest year only)
+  const prior = n >= 3 ? assessRisk(records.slice(0, -1), metrics.slice(0, -1), {}) : null;
   return {
     records, metrics, latest, previous, latestRecord, previousRecord,
-    risk: scoreRisk({ cur: latest, prev: previous, curR: latestRecord, prevR: previousRecord }),
+    risk: assessRisk(records, metrics, inputs),
+    inputs,
     previousScore: prior?.score ?? null,
     alerts: detectAlerts(latest, previous, latestRecord, previousRecord),
     missingFields,
