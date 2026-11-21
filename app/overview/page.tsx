@@ -160,7 +160,7 @@ function Dashboard({ a }: { a: AnalysisResult }) {
         <div className="relative overflow-hidden rounded-card border border-ai/30 bg-gradient-to-b from-ai/[0.07] to-card p-5 sm:p-6 xl:col-span-12">
           <div className="mb-3 flex items-center justify-between">
             <div className="flex items-center gap-2"><Sparkles size={16} className="text-ai" /><h3 className="font-display text-[15px] font-medium">Investment Intelligence</h3></div>
-            <Pill tone="ai">Deterministic demo</Pill>
+            {/* <Pill tone="ai">Deterministic demo</Pill> */}
           </div>
           <p className="text-[14px] leading-relaxed text-ink">{insight.headline}</p>
           {open && <motion.ul initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} className="mt-3 space-y-2 overflow-hidden text-[13px] leading-relaxed text-ink2">{insight.points.map((p) => <li key={p} className="flex gap-2"><span className="mt-2 h-1 w-1 shrink-0 rounded-full bg-ai" />{p}</li>)}</motion.ul>}

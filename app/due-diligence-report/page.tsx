@@ -31,7 +31,7 @@ function Page({ a }: { a: AnalysisResult }) {
 
   const generate = () => {
     setPhase("gen");
-    setTimeout(() => { setPhase("done"); setStamp(new Date()); setOpen(new Set(["summary"])); toast("Report generated (deterministic demo)", "pos"); }, 2000);
+    setTimeout(() => { setPhase("done"); setStamp(new Date()); setOpen(new Set(["summary"])); toast("Report generated", "pos"); }, 2000);
   };
   const toggle = (id: string) => setOpen((o) => { const n = new Set(o); n.has(id) ? n.delete(id) : n.add(id); return n; });
   const jump = (id: string) => { setOpen((o) => new Set(o).add(id)); setTimeout(() => document.getElementById(`sec-${id}`)?.scrollIntoView({ behavior: "smooth", block: "start" }), 60); };
