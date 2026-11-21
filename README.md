@@ -127,3 +127,9 @@ earlier balance-sheet column provides opening balances. A sample is in `data/Gul
 
 Desktop icon-rail sidebar (collapsible) → mobile bottom navigation; tables become cards on mobile; charts and report navigation
 (horizontal section chips) are re-composed for phones; touch targets ≥ 44px.
+
+## Chatbot, notifications and provider exports
+
+- **Assistant:** the floating chat button answers questions about the active company (risk score drivers, red flags, DSO/DIO/DPO, cash release, weights, upload help). By default it uses built-in answers computed from the same engine as the dashboard. Set `ANTHROPIC_API_KEY` (server-side, see `.env.example`) to route questions through Claude instead; the key never reaches the browser.
+- **Notifications:** uploads, parse errors, finished analyses and High/Critical signals appear as popups the moment they happen and are kept in the bell feed with an unread count. The bell offers optional desktop alerts for when the tab is in the background.
+- **Upload formats:** flat table, *Income Statement* + *Balance Sheet* workbook, and S&P Capital IQ *Financial Highlights* exports (the files in `data/`). Provider exports carry reported DSO/DIO but no payables, so DPO and the cash conversion cycle show as unavailable and the score uses the remaining indicators.
