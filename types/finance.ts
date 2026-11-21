@@ -96,4 +96,20 @@ export interface Dataset {
   records: FinancialRecord[]; // raw, as supplied
   unitMultiplier: number; // converts supplied units into AED
   fileName?: string;
+  fileSize?: number;
+  uploadedAt?: string;
+}
+
+/** one row in the upload log; kept (marked deleted) after the company itself is removed */
+export interface HistoryItem {
+  id: string;
+  name: string;
+  fileName?: string;
+  fileSize?: number;
+  uploadedAt: string;
+  rows: number;
+  period: string;
+  status: "active" | "deleted";
+  analysedAt?: string;
+  deletedAt?: string;
 }
