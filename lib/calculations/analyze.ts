@@ -12,6 +12,10 @@ export function scaleRecords(rs: FinancialRecord[], multiplier: number): Financi
     .map((r) => {
       const o = { ...r };
       for (const f of FIELDS) o[f] = r[f] == null ? null : r[f]! * k;
+      const sc = (v: number | null | undefined) => (v == null ? null : v * k);
+      if (r.creditSales !== undefined) o.creditSales = sc(r.creditSales);
+      if (r.creditPurchases !== undefined) o.creditPurchases = sc(r.creditPurchases);
+      if (r.opening) o.opening = { receivables: sc(r.opening.receivables), inventory: sc(r.opening.inventory), payables: sc(r.opening.payables) };
       return o;
     });
 }

@@ -11,9 +11,14 @@ export interface FinancialRecord {
   operatingCashFlow: Num;
   cash: Num;
   debt: Num;
+  /** optional: used instead of revenue / COGS for DSO and DPO when supplied */
+  creditSales?: Num;
+  creditPurchases?: Num;
+  /** optional: prior-year closing balances so the first year can use averages */
+  opening?: { receivables: Num; inventory: Num; payables: Num };
 }
 
-export type FieldKey = Exclude<keyof FinancialRecord, "year">;
+export type FieldKey = "revenue" | "cogs" | "ebitda" | "receivables" | "inventory" | "payables" | "operatingCashFlow" | "cash" | "debt";
 
 export interface YearMetrics {
   year: number;
