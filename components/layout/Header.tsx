@@ -23,7 +23,7 @@ function useOutside(fn: () => void) {
 export function Header() {
   const path = usePathname();
   const router = useRouter();
-  const { datasets, active, setActive, deleteDataset, analysis, toast, notices, markAllRead, clearNotices, desktop, enableDesktop } = useApp();
+  const { datasets, active, hasCompany, setActive, deleteDataset, analysis, toast, notices, markAllRead, clearNotices, desktop, enableDesktop } = useApp();
   const [confirm, setConfirm] = useState<string | null>(null);
   const [sel, setSel] = useState(false);
   const [cmd, setCmd] = useState(false);
@@ -51,8 +51,8 @@ export function Header() {
         <div className="flex min-w-0 items-center gap-3">
           <span className="lg:hidden"><LogoMark size={26} /></span>
           <div className="min-w-0">
-            <div className="hidden font-mono text-[10px] uppercase tracking-[0.16em] text-ink3 sm:block">CashTrap AI /</div>
-            <div className="truncate font-display text-[15px] font-semibold sm:text-[17px]">{page?.label ?? "CashTrap AI"}</div>
+            <div className="hidden font-mono text-[10px] uppercase tracking-[0.16em] text-ink3 sm:block">CashCop AI /</div>
+            <div className="truncate font-display text-[15px] font-semibold sm:text-[17px]">{page?.label ?? "CashCop AI"}</div>
           </div>
         </div>
         <div className="flex items-center gap-2 sm:gap-3">
@@ -60,12 +60,13 @@ export function Header() {
           <div ref={selRef} className="relative">
             <button onClick={() => setSel(!sel)} className="flex h-10 items-center gap-2 rounded-xl border border-line bg-card px-3 text-[12.5px] hover:border-[#3f4551]" aria-haspopup="listbox" aria-expanded={sel}>
               <Building2 size={15} className="text-ink3" />
-              <span className="hidden max-w-[150px] truncate sm:inline">{active.name}</span>
+              <span className={clsx("hidden max-w-[150px] truncate sm:inline", !hasCompany && "text-ink3")}>{hasCompany ? active.name : "No company"}</span>
               <ChevronDown size={14} className="text-ink3" />
             </button>
             <AnimatePresence>
               {sel && (
                 <motion.ul initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} className="absolute right-0 top-12 z-50 w-72 rounded-2xl border border-line bg-elev p-1.5 shadow-2xl" role="listbox">
+                  {datasets.length === 0 && <li className="px-3 py-2.5 text-[12.5px] text-ink3">No company yet. Upload financial statements to begin.</li>}
                   {datasets.map((d) => (
                     <li key={d.id}>
                       {confirm === d.id ? (
@@ -81,7 +82,7 @@ export function Header() {
                           <button onClick={() => { setActive(d.id); setSel(false); toast(`Switched to ${d.name}`); }} className={clsx("flex min-w-0 flex-1 items-center rounded-xl px-3 py-2.5 text-left text-[13px]", d.id === active.id ? "text-ink" : "text-ink2")}>
                             <span className="min-w-0 truncate">{d.name}</span>
                           </button>
-                          {d.id !== "gulftech-demo" && (
+                          {(
                             <button onClick={() => setConfirm(d.id)} aria-label={`Delete ${d.name}`} title="Delete this company" className="mr-1 grid h-9 w-9 shrink-0 place-items-center rounded-lg text-ink3 hover:bg-crit/10 hover:text-crit"><Trash2 size={15} /></button>
                           )}
                         </div>

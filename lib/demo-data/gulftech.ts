@@ -13,3 +13,6 @@ export const GULFTECH: Dataset = {
     { year: 2025, revenue: 471, cogs: 337, ebitda: 79, receivables: 112, inventory: 96, payables: 45, operatingCashFlow: 24, cash: 22, debt: 196, capex: 41, interestExpense: 17, currentAssets: 242, currentLiabilities: 168, principalRepayment: 17, shortTermDebt: 96 },
   ],
 };
+
+/** shown until the user uploads a company or loads the demo: no company, no figures */
+export const NO_COMPANY: Dataset = { id: "", name: "No company selected", industry: "", synthetic: false, records: [], unitMultiplier: 1_000_000 };

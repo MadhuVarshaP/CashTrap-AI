@@ -8,7 +8,6 @@ import { useMemo, useState } from "react";
 import { Dropzone } from "@/components/shared/Dropzone";
 import { Bar, Button, Card, CardHead, PageTitle, Pill } from "@/components/shared/ui";
 import { analyze } from "@/lib/calculations/analyze";
-import { GULFTECH } from "@/lib/demo-data/gulftech";
 import { useApp } from "@/lib/state/store";
 import { REQUIRED_COLUMNS, SAMPLE_CSV, dataQuality } from "@/lib/utilities/parse";
 import type { FieldKey, FinancialRecord } from "@/types/finance";
@@ -21,7 +20,7 @@ const COLS: { key: keyof FinancialRecord; label: string }[] = [
 const UNITS = [{ label: "AED", v: 1 }, { label: "AED thousands", v: 1_000 }, { label: "AED millions", v: 1_000_000 }];
 
 export default function CompanyAnalysis() {
-  const { active, datasets, notify, addDataset, updateDataset, setActive, deleteDataset, history, removeHistory, clearHistory, runAnalysis, status, error, analysis, toast } = useApp();
+  const { active, hasCompany, loadDemo, datasets, notify, addDataset, updateDataset, setActive, deleteDataset, history, removeHistory, clearHistory, runAnalysis, status, error, analysis, toast } = useApp();
   const [confirmDel, setConfirmDel] = useState<string | null>(null);
   const [q, setQ] = useState("");
   const [sort, setSort] = useState<{ k: keyof FinancialRecord; dir: 1 | -1 }>({ k: "year", dir: 1 });
@@ -56,15 +55,15 @@ export default function CompanyAnalysis() {
       {/* <PageTitle title="Company Analysis" sub="Upload financial statements, validate the records, then run the analysis." right={<Pill tone={active.synthetic ? "warn" : "accent"}>{active.synthetic ? "" : "Uploaded data"}</Pill>} /> */}
 
       <div className="grid gap-5 xl:grid-cols-12">
-        <Card className="xl:col-span-7">
+        <Card className={hasCompany ? "xl:col-span-7" : "xl:col-span-12"}>
           <CardHead title="Upload financial records" hint="Columns are matched by name; common aliases (Sales, OCF, Total Debt…) are recognised. Blank cells are treated as missing, never zero." />
           <Dropzone onError={(errs, file) => notify({ title: `Couldn't read ${file.name}`, body: errs[0], tone: "crit" })} onParsed={(records, file, meta, warns) => {
             addDataset({ id: `upload-${Date.now()}`, name: meta?.name ?? file.name.replace(/\.[^.]+$/, ""), industry: "Uploaded company", synthetic: !!meta?.synthetic, records, unitMultiplier: meta?.unitMultiplier ?? 1_000_000, fileName: file.name, fileSize: file.size });
             notify({ title: `Uploaded ${meta?.name ?? file.name}`, body: `${records.length} years loaded${warns?.length ? ` · ${warns.length} data warning${warns.length > 1 ? "s" : ""}` : ""}. Run the analysis next.`, tone: warns?.length ? "warn" : "pos", href: "/company-analysis" });
           }} />
           <div className="mt-4 flex flex-wrap items-center gap-3">
-            <Button variant="ghost" onClick={() => { setActive(GULFTECH.id); toast("Loaded GulfTech demo data (synthetic)", "warn"); }}><Database size={15} /> Explore with GulfTech Demo Data</Button>
-            <a download="cashtrap-ai-template.csv" href={`data:text/csv;charset=utf-8,${encodeURIComponent(SAMPLE_CSV)}`} className="inline-flex items-center gap-2 text-[12.5px] text-ink2 hover:text-ink"><Download size={14} /> Download CSV template</a>
+            <Button variant="ghost" onClick={() => { loadDemo(); toast("Loaded GulfTech demo data (synthetic)", "warn"); }}><Database size={15} /> Explore with GulfTech Demo Data</Button>
+            <a download="cashcop-ai-template.csv" href={`data:text/csv;charset=utf-8,${encodeURIComponent(SAMPLE_CSV)}`} className="inline-flex items-center gap-2 text-[12.5px] text-ink2 hover:text-ink"><Download size={14} /> Download CSV template</a>
           </div>
           <div className="mt-5 border-t border-line pt-4">
             <div className="mb-2 font-mono text-[10px] uppercase tracking-wider text-ink3">Expected columns</div>
@@ -72,7 +71,7 @@ export default function CompanyAnalysis() {
           </div>
         </Card>
 
-        <div className="space-y-5 xl:col-span-5">
+        {hasCompany && <div className="space-y-5 xl:col-span-5">
           <Card>
             <CardHead title="Data quality" right={<Pill tone={ready && !dq.missing.length ? "pos" : ready ? "warn" : "crit"}>{ready ? (dq.missing.length ? "Ready · with gaps" : "Ready") : "Not ready"}</Pill>} />
             <div className="grid grid-cols-3 gap-3">
@@ -132,11 +131,11 @@ export default function CompanyAnalysis() {
               {status === "done" && <Link href="/overview"><Button variant="ghost">View dashboard</Button></Link>}
             </div>
           </Card>
-        </div>
+        </div>}
 
-        <Card className="xl:col-span-12 !px-0 !pb-2">
+        {hasCompany && <Card className="xl:col-span-12 !px-0 !pb-2">
           <div className="px-5 sm:px-6"><CardHead title="Financial records" hint="Click a value to edit it. Edits re-validate immediately; uploaded companies need re-analysis afterwards." right={
-            <div className="relative"><Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink3" /><input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search…" aria-label="Search records" className="h-10 w-40 rounded-xl border border-line bg-bg2 pl-9 pr-3 text-[12.5px] outline-none focus:border-accent sm:w-56" /></div>
+            <div className="relative"><Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink3" /><input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search…" aria-label="Search records" className="h-10 w-40 rounded-xl bg-bg2 pl-9 pr-3 text-[12.5px] outline-none transition-colors placeholder:text-ink3 focus:bg-elev sm:w-56" /></div>
           } /></div>
           {/* desktop / tablet table */}
           <div className="hidden overflow-x-auto md:block">
@@ -154,7 +153,7 @@ export default function CompanyAnalysis() {
                     {COLS.map((c) => (
                       <td key={c.key} className="px-4 py-1.5 font-mono first:pl-6">
                         {c.key === "year" ? <span className="text-ink">{r.year}</span> : (
-                          <input defaultValue={r[c.key] == null ? "" : String(r[c.key])} key={`${r.year}${c.key}${r[c.key]}`} onBlur={(e) => e.target.value !== String(r[c.key] ?? "") && edit(r.year, c.key as FieldKey, e.target.value)} placeholder="missing" aria-label={`${c.label} ${r.year}`} className={clsx("h-9 w-full min-w-[80px] rounded-lg border border-transparent bg-transparent px-2 tabular-nums outline-none hover:border-line focus:border-accent focus:bg-elev", r[c.key] == null ? "placeholder:text-warn" : "text-ink")} />
+                          <input defaultValue={r[c.key] == null ? "" : String(r[c.key])} key={`${r.year}${c.key}${r[c.key]}`} onBlur={(e) => e.target.value !== String(r[c.key] ?? "") && edit(r.year, c.key as FieldKey, e.target.value)} placeholder="missing" aria-label={`${c.label} ${r.year}`} className={clsx("h-9 w-full min-w-[80px] rounded-lg bg-transparent px-2 tabular-nums outline-none transition-colors hover:bg-bg2 focus:bg-elev", r[c.key] == null ? "placeholder:text-warn" : "text-ink")} />
                         )}
                       </td>
                     ))}
@@ -175,7 +174,7 @@ export default function CompanyAnalysis() {
               </div>
             ))}
           </div>
-        </Card>
+        </Card>}
 
         <Card className="xl:col-span-12">
           <CardHead icon={<History size={17} className="text-ink3" />} title="Upload history" hint="A log of every file uploaded in this browser. Deleting a company removes its data but keeps the log entry." right={

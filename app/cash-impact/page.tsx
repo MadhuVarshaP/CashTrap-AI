@@ -22,7 +22,7 @@ function NumField({ label, value, onChange, unit, error }: { label: string; valu
   return (
     <label className="block">
       <span className="mb-1.5 block font-mono text-[10.5px] uppercase tracking-wider text-ink3">{label}</span>
-      <span className={clsx("flex h-12 items-center rounded-xl border bg-bg2 px-3 focus-within:border-accent", error ? "border-crit" : "border-line")}>
+      <span className={clsx("flex h-12 items-center rounded-xl bg-bg2 px-3 transition-colors focus-within:bg-elev", error && "ring-1 ring-crit/70")}>
         <input inputMode="decimal" value={value} onChange={(e) => onChange(e.target.value)} className="w-full bg-transparent font-mono text-[16px] tabular-nums outline-none" aria-invalid={!!error} />
         <span className="ml-2 whitespace-nowrap font-mono text-[11px] text-ink3">{unit}</span>
       </span>
@@ -35,8 +35,9 @@ export default function CashImpact() {
   const { analysis, active } = useApp();
   // DSO is measured on credit sales when supplied, so the same base is used for the cash-release maths
   const creditBasis = analysis?.latestRecord.creditSales != null;
-  const defRev = analysis?.latestRecord.creditSales ?? analysis?.latestRecord.revenue ?? 471;
-  const defDso = analysis?.latest.dso ?? 75.9;
+  // no analysed company: the calculator starts blank rather than showing someone's figures
+  const defRev = analysis ? analysis.latestRecord.creditSales ?? analysis.latestRecord.revenue : null;
+  const defDso = analysis?.latest.dso ?? null;
 
   const [rev, setRev] = useState("");
   const [dso, setDso] = useState("");
@@ -44,6 +45,7 @@ export default function CashImpact() {
   const [sel, setSel] = useState(1);
 
   const reset = () => {
+    if (defRev == null || defDso == null) { setRev(""); setDso(""); setTargets([]); return; }
     setRev(defRev.toFixed(1)); setDso(defDso.toFixed(1));
     setTargets(SCEN.map((s) => Math.max(0, Math.round(defDso - s.cut))));
   };
@@ -51,9 +53,13 @@ export default function CashImpact() {
   useEffect(reset, [active.id, analysis?.generatedAt]);
 
   const R = num(rev), D = num(dso);
-  const revErr = isNaN(R) ? "Enter a number" : R <= 0 ? "Must be greater than 0" : undefined;
-  const dsoErr = isNaN(D) ? "Enter a number" : D < 0 || D > 365 ? "Between 0 and 365" : undefined;
-  const valid = !revErr && !dsoErr && targets.length === 3;
+  const revErr = rev.trim() === "" ? undefined : isNaN(R) ? "Enter a number" : R <= 0 ? "Must be greater than 0" : undefined;
+  const dsoErr = dso.trim() === "" ? undefined : isNaN(D) ? "Enter a number" : D < 0 || D > 365 ? "Between 0 and 365" : undefined;
+  const inputsOk = !isNaN(R) && R > 0 && !isNaN(D) && D >= 0 && D <= 365;
+  // typing a DSO into the blank calculator sets the three scenario targets from it
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { if (inputsOk && targets.length === 0) setTargets(SCEN.map((s) => Math.max(0, Math.round(D - s.cut)))); }, [inputsOk]);
+  const valid = inputsOk && targets.length === 3;
   const T = targets[sel] ?? 0;
   const set = (i: number, v: number) => setTargets((t) => t.map((x, j) => (j === i ? v : x)));
   const release = (t: number) => (valid ? cashRelease(R, D, t) : 0);
@@ -70,10 +76,10 @@ export default function CashImpact() {
 
   return (
     <>
-      <PageTitle title="Cash Impact Calculator" sub="Quantify the working-capital cash that better collections could release." right={<Button variant="ghost" onClick={reset}><RotateCcw size={14} /> Reset to company data</Button>} />
+      <PageTitle title="Cash Impact Calculator" sub="Quantify the working-capital cash that better collections could release." right={<Button variant="ghost" onClick={reset}><RotateCcw size={14} /> {analysis ? "Reset to company data" : "Clear inputs"}</Button>} />
       <div className="grid gap-5 xl:grid-cols-12">
         <Card className="xl:col-span-4">
-          <CardHead title="Inputs" hint="Prefilled from the active company's latest year. Edit any value to model your own case." />
+          <CardHead title="Inputs" hint={analysis ? "Prefilled from the active company's latest year. Edit any value to model your own case." : "No company loaded. Enter your own revenue and DSO to model a case."} />
           <div className="space-y-4">
             <NumField label={creditBasis ? "Annual credit sales" : "Annual revenue"} value={rev} onChange={setRev} unit="AED m" error={revErr} />
             <NumField label="Current DSO" value={dso} onChange={setDso} unit="days" error={dsoErr} />
@@ -108,7 +114,7 @@ export default function CashImpact() {
 
           <div className="grid gap-4 md:grid-cols-3">
             {SCEN.map((s, i) => (
-              <button key={s.id} onClick={() => setSel(i)} aria-pressed={sel === i} className={clsx("rounded-card border bg-card p-5 text-left transition-colors", sel === i ? "border-[#4a505c] bg-elev" : "border-line hover:border-[#3a3f49]")}>
+              <button key={s.id} onClick={() => setSel(i)} aria-pressed={sel === i} className={clsx("tap rounded-card border bg-card p-5 text-left", sel === i ? "border-[#4a505c] bg-elev" : "border-line hover:border-[#3a3f49]")}>
                 <div className="flex items-center gap-2 text-[13px] font-medium"><span className="h-2.5 w-2.5 rounded-full" style={{ background: s.color }} />{s.name}</div>
                 <div className="mt-2 font-display text-[24px] font-semibold tabular-nums">{valid ? `AED ${fmtNum(Math.max(0, release(targets[i] ?? 0)))}m` : "—"}</div>
                 <div className="mt-1 font-mono text-[11px] text-ink3">Target {targets[i]}d</div>

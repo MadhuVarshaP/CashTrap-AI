@@ -2,7 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import type { AnalysisResult, AssessmentInputs, Dataset, HistoryItem } from "@/types/finance";
-import { GULFTECH } from "@/lib/demo-data/gulftech";
+import { GULFTECH, NO_COMPANY } from "@/lib/demo-data/gulftech";
 import { analyze } from "@/lib/calculations/analyze";
 import { analyzeRemote } from "@/lib/api/client";
 
@@ -15,6 +15,9 @@ export type NoticeInput = Pick<Notice, "title"> & Partial<Pick<Notice, "tone" | 
 interface Ctx {
   datasets: Dataset[];
   active: Dataset;
+  /** false until a company is uploaded or the demo is loaded */
+  hasCompany: boolean;
+  loadDemo: () => void;
   setActive: (id: string) => void;
   addDataset: (d: Dataset) => void;
   updateDataset: (d: Dataset) => void;
@@ -48,11 +51,12 @@ export const useApp = () => {
   return v;
 };
 
-const KEY = "cashtrap-ai.v1";
-interface Persisted { uploads: Dataset[]; activeId: string; analysed: string[]; history: HistoryItem[]; notices?: Notice[]; demoInputs?: AssessmentInputs }
+const KEY = "cashcop-ai.v1";
+const OLD_KEY = "cashtrap-ai.v1"; // before the rename
+interface Persisted { uploads: Dataset[]; activeId: string; analysed: string[]; history: HistoryItem[]; notices?: Notice[] }
 
 const read = (): Persisted | null => {
-  try { const raw = localStorage.getItem(KEY); return raw ? (JSON.parse(raw) as Persisted) : null; } catch { return null; }
+  try { const raw = localStorage.getItem(KEY) ?? localStorage.getItem(OLD_KEY); return raw ? (JSON.parse(raw) as Persisted) : null; } catch { return null; }
 };
 const write = (p: Persisted) => {
   try { localStorage.setItem(KEY, JSON.stringify(p)); } catch { /* storage unavailable or full: history is a convenience */ }
@@ -64,12 +68,12 @@ const period = (d: Dataset) => {
 };
 
 export function AppProvider({ children }: { children: ReactNode }) {
-  const [datasets, setDatasets] = useState<Dataset[]>([GULFTECH]);
-  const [activeId, setActiveId] = useState(GULFTECH.id);
-  // Demo data is pre-analysed so the dashboard is immediately populated.
-  const [results, setResults] = useState<Record<string, AnalysisResult | null>>({ [GULFTECH.id]: analyze(GULFTECH) });
+  // nothing is shown until the user uploads a company or loads the demo
+  const [datasets, setDatasets] = useState<Dataset[]>([]);
+  const [activeId, setActiveId] = useState("");
+  const [results, setResults] = useState<Record<string, AnalysisResult | null>>({});
   const [history, setHistory] = useState<HistoryItem[]>([]);
-  const [status, setStatus] = useState<Status>("done");
+  const [status, setStatus] = useState<Status>("idle");
   const [error, setError] = useState<string | null>(null);
   const [notices, setNotices] = useState<Notice[]>([]);
   const [popups, setPopups] = useState<string[]>([]);
@@ -81,17 +85,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const saved = read();
     if (saved) {
-      const uploads = saved.uploads.filter((d) => d.id !== GULFTECH.id);
-      const demo: Dataset = { ...GULFTECH, inputs: saved.demoInputs };
-      const res: Record<string, AnalysisResult | null> = { [GULFTECH.id]: analyze(demo) };
-      for (const d of uploads) res[d.id] = saved.analysed.includes(d.id) ? analyze(d) : null;
-      setDatasets([demo, ...uploads]);
+      const all = (saved.uploads ?? []).filter((d) => d.id);
+      const res: Record<string, AnalysisResult | null> = {};
+      for (const d of all) res[d.id] = saved.analysed.includes(d.id) ? analyze(d) : null;
+      setDatasets(all);
       setResults(res);
       setHistory(saved.history ?? []);
       setNotices(saved.notices ?? []);
-      const id = [demo, ...uploads].some((d) => d.id === saved.activeId) ? saved.activeId : GULFTECH.id;
+      const id = all.some((d) => d.id === saved.activeId) ? saved.activeId : "";
       setActiveId(id);
-      setStatus(res[id] ? "done" : "idle");
+      setStatus(id && res[id] ? "done" : "idle");
     }
     if (typeof Notification !== "undefined") setDesktop(Notification.permission);
     setHydrated(true);
@@ -100,16 +103,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!hydrated) return;
     write({
-      uploads: datasets.filter((d) => d.id !== GULFTECH.id),
+      uploads: datasets,
       activeId,
-      analysed: Object.entries(results).filter(([id, r]) => r && id !== GULFTECH.id).map(([id]) => id),
+      analysed: Object.entries(results).filter(([, r]) => r).map(([id]) => id),
       history,
       notices: notices.slice(0, 40),
-      demoInputs: datasets.find((d) => d.id === GULFTECH.id)?.inputs,
     });
   }, [hydrated, datasets, activeId, results, history, notices]);
 
-  const active = datasets.find((d) => d.id === activeId) ?? datasets[0];
+  const active = datasets.find((d) => d.id === activeId) ?? NO_COMPANY;
 
   const dismissPopup = useCallback((id: string) => setPopups((p) => p.filter((x) => x !== id)), []);
 
@@ -121,7 +123,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setPopups((p) => [...p, id].slice(-4));
     setTimeout(() => setPopups((p) => p.filter((x) => x !== id)), 6000);
     try {
-      if (typeof Notification !== "undefined" && Notification.permission === "granted" && document.hidden) new Notification(`CashTrap AI · ${n.title}`, { body: n.body, tag: id });
+      if (typeof Notification !== "undefined" && Notification.permission === "granted" && document.hidden) new Notification(`CashCop AI · ${n.title}`, { body: n.body, tag: id });
     } catch { /* desktop notifications are optional */ }
   }, []);
   const toast = useCallback((text: string, tone: Tone = "info") => notify({ title: text, tone }), [notify]);
@@ -151,6 +153,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setError(null);
   }, []);
 
+  /** loads the synthetic GulfTech sample, pre-analysed, only when the user asks for it */
+  const loadDemo = useCallback(() => {
+    setDatasets((all) => (all.some((d) => d.id === GULFTECH.id) ? all : [...all, GULFTECH]));
+    setResults((r) => ({ ...r, [GULFTECH.id]: r[GULFTECH.id] ?? analyze(GULFTECH) }));
+    setActiveId(GULFTECH.id);
+    setStatus("done");
+    setError(null);
+  }, []);
+
   const updateDataset = useCallback((d: Dataset) => {
     setDatasets((ds) => ds.map((x) => (x.id === d.id ? d : x)));
     setResults((r) => ({ ...r, [d.id]: d.id === GULFTECH.id ? analyze(d) : null }));
@@ -166,14 +177,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [datasets, activeId]);
 
   const deleteDataset = useCallback((id: string) => {
-    if (id === GULFTECH.id) return; // the built-in demo can't be removed
-    setDatasets((ds) => ds.filter((d) => d.id !== id));
+    const left = datasets.filter((d) => d.id !== id);
+    setDatasets(left);
     setResults((r) => { const { [id]: _drop, ...rest } = r; void _drop; return rest; });
     setHistory((h) => h.map((x) => (x.id === id ? { ...x, status: "deleted" as const, deletedAt: new Date().toISOString() } : x)));
-    setActiveId((cur) => (cur === id ? GULFTECH.id : cur));
-    setStatus((s) => (activeId === id ? "done" : s));
+    if (activeId === id) {
+      const next = left[left.length - 1]?.id ?? "";
+      setActiveId(next);
+      setStatus(next && results[next] ? "done" : "idle");
+    }
     setError(null);
-  }, [activeId]);
+  }, [activeId, datasets, results]);
 
   const removeHistory = useCallback((id: string) => setHistory((h) => h.filter((x) => x.id !== id)), []);
   const clearHistory = useCallback(() => setHistory((h) => h.filter((x) => x.status === "active")), []);
@@ -199,8 +213,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [active, toast, notify]);
 
   const value = useMemo<Ctx>(
-    () => ({ datasets, active, setActive, addDataset, updateDataset, updateInputs, deleteDataset, history, removeHistory, clearHistory, analysis: results[active.id] ?? null, status, error, runAnalysis, notices, popups, notify, toast, dismissPopup, markAllRead, clearNotices, desktop, enableDesktop }),
-    [datasets, active, setActive, addDataset, updateDataset, updateInputs, deleteDataset, history, removeHistory, clearHistory, results, status, error, runAnalysis, notices, popups, notify, toast, dismissPopup, markAllRead, clearNotices, desktop, enableDesktop]
+    () => ({ datasets, active, hasCompany: active.id !== "", loadDemo, setActive, addDataset, updateDataset, updateInputs, deleteDataset, history, removeHistory, clearHistory, analysis: results[active.id] ?? null, status, error, runAnalysis, notices, popups, notify, toast, dismissPopup, markAllRead, clearNotices, desktop, enableDesktop }),
+    [datasets, active, loadDemo, setActive, addDataset, updateDataset, updateInputs, deleteDataset, history, removeHistory, clearHistory, results, status, error, runAnalysis, notices, popups, notify, toast, dismissPopup, markAllRead, clearNotices, desktop, enableDesktop]
   );
   return <C.Provider value={value}>{children}</C.Provider>;
 }
