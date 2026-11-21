@@ -8,7 +8,14 @@ body { overflow-x: hidden; font-feature-settings: "tnum" 1, "cv11" 1; }
 ::selection { background: rgba(57, 136, 245, .35); }
 * { scrollbar-width: thin; scrollbar-color: #292D35 transparent; }
 input[type="range"] { accent-color: #3988F5; }
+/* text fields show focus by a lighter fill, not a border or outline */
 :focus-visible { outline: 2px solid #3988F5; outline-offset: 2px; }
+input:not([type="range"]):not([type="checkbox"]):not([type="file"]):focus-visible, select:focus-visible { outline: none; }
+
+/* shared press / hover feel for every clickable control */
+.tap { transition: transform .15s ease, background-color .2s ease, border-color .2s ease, color .2s ease, box-shadow .2s ease; }
+.tap:not(:disabled):hover { transform: translateY(-1px); }
+.tap:not(:disabled):active { transform: translateY(0) scale(.97); }
 
 @media print {
   html, body { background: #fff !important; color: #111 !important; }

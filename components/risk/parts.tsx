@@ -71,7 +71,7 @@ export function NumInput({ label, value, unit, onCommit, hint, step = "any" }: {
   return (
     <label className="block">
       <span className="mb-1.5 block font-mono text-[10.5px] uppercase tracking-wider text-ink3">{label}</span>
-      <span className="flex h-11 items-center rounded-xl border border-line bg-bg2 px-3 focus-within:border-accent">
+      <span className="flex h-11 items-center rounded-xl bg-bg2 px-3 transition-colors focus-within:bg-elev">
         <input inputMode="decimal" step={step} value={txt} onChange={(e) => setTxt(e.target.value)} onBlur={commit} onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()} className="w-full bg-transparent font-mono text-[15px] tabular-nums outline-none placeholder:text-ink3" placeholder="not entered" />
         {unit && <span className="ml-2 whitespace-nowrap font-mono text-[11px] text-ink3">{unit}</span>}
       </span>

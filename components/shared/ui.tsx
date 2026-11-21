@@ -64,11 +64,11 @@ export function Pill({ children, tone = "neutral", className }: { children: Reac
 
 export function Button({ variant = "primary", className, ...p }: React.ButtonHTMLAttributes<HTMLButtonElement> & { variant?: "primary" | "ghost" | "ai" }) {
   const v = {
-    primary: "bg-accent text-white hover:bg-[#4d97ff] disabled:bg-elev disabled:text-ink3",
-    ghost: "border border-line bg-elev text-ink hover:border-[#3f4551] disabled:text-ink3",
-    ai: "border border-ai/40 bg-ai/10 text-ai hover:bg-ai/20",
+    primary: "bg-gradient-to-b from-[#4d97ff] to-[#3282ea] text-white shadow-[inset_0_1px_0_rgba(255,255,255,.22),0_6px_18px_-8px_rgba(57,136,245,.9)] hover:from-[#5aa1ff] hover:to-[#3a8cf5] hover:shadow-[inset_0_1px_0_rgba(255,255,255,.28),0_10px_24px_-8px_rgba(57,136,245,1)] disabled:bg-none disabled:bg-elev disabled:text-ink3 disabled:shadow-none",
+    ghost: "border border-line bg-elev/70 text-ink hover:border-accent/50 hover:bg-[#222732] hover:shadow-[0_8px_20px_-12px_rgba(57,136,245,.6)] disabled:text-ink3",
+    ai: "border border-ai/40 bg-ai/10 text-ai hover:border-ai/70 hover:bg-ai/20 hover:shadow-[0_8px_22px_-10px_rgba(167,139,250,.8)]",
   }[variant];
-  return <button {...p} className={clsx("inline-flex min-h-[44px] items-center justify-center gap-2 rounded-xl px-4 text-[13px] font-medium transition-colors disabled:cursor-not-allowed sm:min-h-[40px]", v, className)} />;
+  return <button {...p} className={clsx("tap inline-flex min-h-[44px] items-center justify-center gap-2 rounded-xl px-4 text-[13px] font-medium disabled:cursor-not-allowed sm:min-h-[40px] [&>svg]:transition-transform [&>svg]:duration-200 hover:[&>svg]:scale-110", v, className)} />;
 }
 
 export function PageTitle({ title, sub, right }: { title: string; sub: string; right?: ReactNode }) {

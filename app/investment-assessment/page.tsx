@@ -53,7 +53,7 @@ function Page({ a }: { a: AnalysisResult }) {
       } />
       <div role="tablist" aria-label="Investment risk sections" className="-mx-4 mb-6 flex gap-1.5 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0">
         {TABS.map((t) => (
-          <button key={t.id} role="tab" aria-selected={tab === t.id} onClick={() => setTab(t.id)} className={clsx("shrink-0 rounded-xl border px-4 py-2.5 text-[13px] transition-colors", tab === t.id ? "border-accent/50 bg-accent/10 text-ink" : "border-line bg-card text-ink2 hover:border-[#3f4551] hover:text-ink")}>{t.label}</button>
+          <button key={t.id} role="tab" aria-selected={tab === t.id} onClick={() => setTab(t.id)} className={clsx("tap shrink-0 rounded-xl border px-4 py-2.5 text-[13px]", tab === t.id ? "border-accent/50 bg-accent/10 text-ink" : "border-line bg-card text-ink2 hover:border-[#3f4551] hover:text-ink")}>{t.label}</button>
         ))}
       </div>
       <motion.div key={tab} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25 }}>
