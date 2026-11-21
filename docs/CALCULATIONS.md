@@ -1,4 +1,4 @@
-# CashTrap AI — Calculation Reference
+# CashCop AI — Calculation Reference
 
 Every number the app shows is computed by the code listed next to each section. This document states the **inputs, formula,
 thresholds and edge-case rules** so each can be re-checked by hand or in Excel.

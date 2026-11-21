@@ -1,6 +1,6 @@
-# CashTrap AI — Find the cash traps before you invest.
+# CashCop AI — Find the cash traps before you invest.
 
-AI-assisted financial due diligence for private equity. CashTrap AI looks past reported
+AI-assisted financial due diligence for private equity. CashCop AI looks past reported
 profitability to show how efficiently a business actually turns profit into cash, and
 surfaces working-capital "cash traps" before capital is committed.
 

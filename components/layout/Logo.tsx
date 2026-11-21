@@ -1,4 +1,4 @@
-/** CashTrap AI mark: a scope ring whose cash-flow line splits into two diverging paths (profit vs cash). */
+/** CashCop AI mark: a scope ring whose cash-flow line splits into two diverging paths (profit vs cash). */
 export function LogoMark({ size = 30 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 32 32" fill="none" aria-hidden>
@@ -15,7 +15,7 @@ export function LogoMark({ size = 30 }: { size?: number }) {
 export function Wordmark() {
   return (
     <div className="leading-none">
-      <div className="font-display text-[15px] font-semibold tracking-[0.14em] text-ink">CASHTRAP AI</div>
+      <div className="font-display text-[15px] font-semibold tracking-[0.14em] text-ink">CASHCOP AI</div>
       <div className="mt-1 text-[10px] text-ink3">Find the cash traps.</div>
     </div>
   );

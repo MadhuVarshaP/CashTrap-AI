@@ -9,7 +9,7 @@ const manrope = Manrope({ subsets: ["latin"], variable: "--font-manrope" });
 const mono = JetBrains_Mono({ subsets: ["latin"], variable: "--font-mono" });
 
 export const metadata: Metadata = {
-  title: "CashTrap AI — Find the cash traps before you invest",
+  title: "CashCop AI — Find the cash traps before you invest",
   icons: { icon: "/favicon.svg" },
   description: "Financial due diligence for private equity: find the cash traps before you invest.",
 };
