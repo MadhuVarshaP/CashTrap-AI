@@ -44,6 +44,10 @@ No login, payments, portfolio management or market feeds, by design.
 If you still see `STATIC_BUILD_NO_OUT_DIR`, open *Project Settings → Build & Development Settings* and set **Framework Preset = Next.js**,
 leaving **Output Directory** empty (not `public`). No environment variables are required for the demo.
 
+## Documentation
+
+- [`docs/CALCULATIONS.md`](docs/CALCULATIONS.md): every formula, threshold, weight and edge case, with a worked example to re-check by hand or in Excel.
+
 ## Pages
 
 | Route | Purpose |
