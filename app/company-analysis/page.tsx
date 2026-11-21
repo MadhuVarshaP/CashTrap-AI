@@ -20,7 +20,7 @@ const COLS: { key: keyof FinancialRecord; label: string }[] = [
 const UNITS = [{ label: "AED", v: 1 }, { label: "AED thousands", v: 1_000 }, { label: "AED millions", v: 1_000_000 }];
 
 export default function CompanyAnalysis() {
-  const { active, datasets, addDataset, updateDataset, setActive, deleteDataset, history, removeHistory, clearHistory, runAnalysis, status, error, analysis, toast } = useApp();
+  const { active, datasets, notify, addDataset, updateDataset, setActive, deleteDataset, history, removeHistory, clearHistory, runAnalysis, status, error, analysis, toast } = useApp();
   const [confirmDel, setConfirmDel] = useState<string | null>(null);
   const [q, setQ] = useState("");
   const [sort, setSort] = useState<{ k: keyof FinancialRecord; dir: 1 | -1 }>({ k: "year", dir: 1 });
@@ -52,9 +52,9 @@ export default function CompanyAnalysis() {
       <div className="grid gap-5 xl:grid-cols-12">
         <Card className="xl:col-span-7">
           <CardHead title="Upload financial records" hint="Columns are matched by name; common aliases (Sales, OCF, Total Debt…) are recognised. Blank cells are treated as missing, never zero." />
-          <Dropzone onParsed={(records, file, meta) => {
+          <Dropzone onError={(errs, file) => notify({ title: `Couldn't read ${file.name}`, body: errs[0], tone: "crit" })} onParsed={(records, file, meta, warns) => {
             addDataset({ id: `upload-${Date.now()}`, name: meta?.name ?? file.name.replace(/\.[^.]+$/, ""), industry: "Uploaded company", synthetic: !!meta?.synthetic, records, unitMultiplier: meta?.unitMultiplier ?? 1_000_000, fileName: file.name, fileSize: file.size });
-            toast(`Loaded ${records.length} years from ${file.name}`, "pos");
+            notify({ title: `Uploaded ${meta?.name ?? file.name}`, body: `${records.length} years loaded${warns?.length ? ` · ${warns.length} data warning${warns.length > 1 ? "s" : ""}` : ""}. Run the analysis next.`, tone: warns?.length ? "warn" : "pos", href: "/company-analysis" });
           }} />
           <div className="mt-4 flex flex-wrap items-center gap-3">
             <Button variant="ghost" onClick={() => { setActive(GULFTECH.id); toast("Loaded GulfTech demo data (synthetic)", "warn"); }}><Database size={15} /> Explore with GulfTech Demo Data</Button>

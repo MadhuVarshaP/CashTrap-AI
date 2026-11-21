@@ -9,7 +9,7 @@ import { parseFinancialFile, type ParseMeta } from "@/lib/utilities/parse";
 
 type S = { kind: "idle" } | { kind: "reading"; name: string; pct: number } | { kind: "ok"; name: string; warnings: string[]; notes: string[] } | { kind: "error"; errors: string[] };
 
-export function Dropzone({ onParsed }: { onParsed: (r: FinancialRecord[], file: File, meta?: ParseMeta) => void }) {
+export function Dropzone({ onParsed, onError }: { onParsed: (r: FinancialRecord[], file: File, meta?: ParseMeta, warnings?: string[]) => void; onError?: (errors: string[], file: File) => void }) {
   const [s, setS] = useState<S>({ kind: "idle" });
   const [over, setOver] = useState(false);
   const input = useRef<HTMLInputElement>(null);
@@ -20,9 +20,9 @@ export function Dropzone({ onParsed }: { onParsed: (r: FinancialRecord[], file: 
     const t = setInterval(() => setS((p) => (p.kind === "reading" ? { ...p, pct: Math.min(90, p.pct + 18) } : p)), 90);
     const res = await parseFinancialFile(file);
     clearInterval(t);
-    if (res.errors.length) return setS({ kind: "error", errors: res.errors.slice(0, 5) });
+    if (res.errors.length) { onError?.(res.errors, file); return setS({ kind: "error", errors: res.errors.slice(0, 5) }); }
     setS({ kind: "ok", name: file.name, warnings: res.warnings.slice(0, 6), notes: res.notes ?? [] });
-    onParsed(res.records, file, res.meta);
+    onParsed(res.records, file, res.meta, res.warnings);
   }
 
   return (

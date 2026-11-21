@@ -2,7 +2,7 @@
 
 import clsx from "clsx";
 import { AnimatePresence, motion } from "framer-motion";
-import { Bell, Building2, Check, ChevronDown, Search, Trash2 } from "lucide-react";
+import { Bell, BellRing, Building2, Check, ChevronDown, Search, Trash2 } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { useApp } from "@/lib/state/store";
@@ -23,7 +23,7 @@ function useOutside(fn: () => void) {
 export function Header() {
   const path = usePathname();
   const router = useRouter();
-  const { datasets, active, setActive, deleteDataset, analysis, toast } = useApp();
+  const { datasets, active, setActive, deleteDataset, analysis, toast, notices, markAllRead, clearNotices, desktop, enableDesktop } = useApp();
   const [confirm, setConfirm] = useState<string | null>(null);
   const [sel, setSel] = useState(false);
   const [cmd, setCmd] = useState(false);
@@ -41,7 +41,9 @@ export function Header() {
     return () => window.removeEventListener("keydown", h);
   }, []);
 
-  const critical = analysis?.alerts.filter((a) => a.severity === "Critical" || a.severity === "High") ?? [];
+  const unread = notices.filter((n) => !n.read).length;
+  const dot = { pos: "bg-pos", warn: "bg-warn", crit: "bg-crit", info: "bg-accent" };
+  const ago = (iso: string) => { const m = Math.round((Date.now() - new Date(iso).getTime()) / 60000); return m < 1 ? "now" : m < 60 ? `${m}m` : m < 1440 ? `${Math.round(m / 60)}h` : `${Math.round(m / 1440)}d`; };
 
   return (
     <>
@@ -97,23 +99,34 @@ export function Header() {
           </button>
           <button onClick={() => setCmd(true)} className="grid h-10 w-10 place-items-center rounded-xl border border-line bg-card text-ink2 md:hidden" aria-label="Search"><Search size={16} /></button>
           <div ref={bellRef} className="relative">
-            <button onClick={() => setBell(!bell)} className="relative grid h-10 w-10 place-items-center rounded-xl border border-line bg-card text-ink2 hover:border-[#3f4551]" aria-label="Notifications">
+            <button onClick={() => { setBell(!bell); if (!bell) setTimeout(markAllRead, 1200); }} className="relative grid h-10 w-10 place-items-center rounded-xl border border-line bg-card text-ink2 hover:border-[#3f4551]" aria-label="Notifications">
               <Bell size={16} />
-              {critical.length > 0 && <span className="absolute right-2.5 top-2.5 h-2 w-2 rounded-full bg-crit" />}
+              {unread > 0 && <span className="absolute -right-1 -top-1 grid h-[18px] min-w-[18px] place-items-center rounded-full bg-crit px-1 font-mono text-[10px] font-semibold text-white">{unread > 9 ? "9+" : unread}</span>}
             </button>
             <AnimatePresence>
               {bell && (
-                <motion.div initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="absolute right-0 top-12 z-50 w-[300px] rounded-2xl border border-line bg-elev p-3 shadow-2xl">
-                  <div className="mb-2 px-1 font-mono text-[10px] uppercase tracking-wider text-ink3">Priority signals</div>
-                  {critical.length === 0 && <p className="px-1 py-2 text-[13px] text-ink2">No high-severity signals for this company.</p>}
-                  {critical.slice(0, 4).map((a) => (
-                    <button key={a.id} onClick={() => { router.push("/investment-assessment"); setBell(false); }} className="block w-full rounded-lg px-2 py-2 text-left text-[12.5px] text-ink2 hover:bg-card"><span className="mr-2 font-mono text-[10px] text-crit">{a.severity.toUpperCase()}</span>{a.name}</button>
-                  ))}
+                <motion.div initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="absolute right-0 top-12 z-50 w-[min(340px,calc(100vw-2rem))] rounded-2xl border border-line bg-elev p-2 shadow-2xl">
+                  <div className="mb-1 flex items-center justify-between px-2 pt-1">
+                    <span className="font-mono text-[10px] uppercase tracking-wider text-ink3">Notifications</span>
+                    {notices.length > 0 && <button onClick={clearNotices} className="text-[11px] text-ink3 hover:text-ink">Clear all</button>}
+                  </div>
+                  <div className="max-h-[360px] overflow-y-auto">
+                    {notices.length === 0 && <p className="px-2 py-4 text-[13px] text-ink2">Nothing yet. Upload a file or run an analysis and updates appear here as they happen.</p>}
+                    {notices.map((n) => (
+                      <button key={n.id} onClick={() => { if (n.href) router.push(n.href); setBell(false); }} className="flex w-full gap-2.5 rounded-lg px-2 py-2.5 text-left hover:bg-card">
+                        <span className={clsx("mt-1.5 h-2 w-2 shrink-0 rounded-full", dot[n.tone])} />
+                        <span className="min-w-0 flex-1"><span className="block truncate text-[12.5px] text-ink">{n.title}</span>{n.body && <span className="block text-[11.5px] leading-snug text-ink2">{n.body}</span>}</span>
+                        <span className="shrink-0 font-mono text-[10px] text-ink3">{ago(n.at)}</span>
+                      </button>
+                    ))}
+                  </div>
+                  {desktop === "default" && <button onClick={enableDesktop} className="mt-1 flex w-full items-center gap-2 rounded-lg border border-line px-3 py-2 text-left text-[12px] text-ink2 hover:bg-card"><BellRing size={14} className="text-accent" /> Also alert me on my desktop when this tab is in the background</button>}
+                  {desktop === "denied" && <p className="px-2 pt-1 text-[11px] text-ink3">Desktop alerts are blocked in your browser settings.</p>}
                 </motion.div>
               )}
             </AnimatePresence>
           </div>
-          <div className="hidden h-10 w-10 place-items-center rounded-xl bg-elev font-display text-[13px] font-semibold text-ink2 sm:grid" aria-label="Profile">MV</div>
+          {/* <div className="hidden h-10 w-10 place-items-center rounded-xl bg-elev font-display text-[13px] font-semibold text-ink2 sm:grid" aria-label="Profile">MV</div> */}
         </div>
       </header>
       {active.synthetic && <div className="border-b border-warn/20 bg-warn/5 px-4 py-1.5 text-center font-mono text-[10px] uppercase tracking-wider text-warn md:hidden print:hidden">Demo data · all figures synthetic</div>}

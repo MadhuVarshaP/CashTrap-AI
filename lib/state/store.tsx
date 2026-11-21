@@ -8,7 +8,9 @@ import { analyzeRemote } from "@/lib/api/client";
 
 export type Status = "idle" | "processing" | "done" | "failed";
 
-interface Toast { id: number; text: string; tone: "pos" | "warn" | "crit" | "info" }
+export type Tone = "pos" | "warn" | "crit" | "info";
+export interface Notice { id: string; tone: Tone; title: string; body?: string; at: string; read: boolean; href?: string }
+export type NoticeInput = Pick<Notice, "title"> & Partial<Pick<Notice, "tone" | "body" | "href">>;
 
 interface Ctx {
   datasets: Dataset[];
@@ -24,8 +26,17 @@ interface Ctx {
   status: Status;
   error: string | null;
   runAnalysis: () => Promise<void>;
-  toasts: Toast[];
-  toast: (text: string, tone?: Toast["tone"]) => void;
+  /** persistent feed behind the bell */
+  notices: Notice[];
+  /** ids currently shown as popups */
+  popups: string[];
+  notify: (n: NoticeInput) => void;
+  toast: (text: string, tone?: Tone) => void;
+  dismissPopup: (id: string) => void;
+  markAllRead: () => void;
+  clearNotices: () => void;
+  desktop: "unsupported" | "default" | "granted" | "denied";
+  enableDesktop: () => Promise<void>;
 }
 
 const C = createContext<Ctx | null>(null);
@@ -36,7 +47,7 @@ export const useApp = () => {
 };
 
 const KEY = "cashtrap-ai.v1";
-interface Persisted { uploads: Dataset[]; activeId: string; analysed: string[]; history: HistoryItem[] }
+interface Persisted { uploads: Dataset[]; activeId: string; analysed: string[]; history: HistoryItem[]; notices?: Notice[] }
 
 const read = (): Persisted | null => {
   try { const raw = localStorage.getItem(KEY); return raw ? (JSON.parse(raw) as Persisted) : null; } catch { return null; }
@@ -58,7 +69,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [status, setStatus] = useState<Status>("done");
   const [error, setError] = useState<string | null>(null);
-  const [toasts, setToasts] = useState<Toast[]>([]);
+  const [notices, setNotices] = useState<Notice[]>([]);
+  const [popups, setPopups] = useState<string[]>([]);
+  const [desktop, setDesktop] = useState<Ctx["desktop"]>("unsupported");
   const hydrated = useRef(false);
 
   // Restore uploads + history from this browser after mount (avoids server/client mismatch).
@@ -71,10 +84,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setDatasets([GULFTECH, ...uploads]);
       setResults(res);
       setHistory(saved.history ?? []);
+      setNotices(saved.notices ?? []);
       const id = [GULFTECH, ...uploads].some((d) => d.id === saved.activeId) ? saved.activeId : GULFTECH.id;
       setActiveId(id);
       setStatus(res[id] ? "done" : "idle");
     }
+    if (typeof Notification !== "undefined") setDesktop(Notification.permission);
     hydrated.current = true;
   }, []);
 
@@ -85,16 +100,34 @@ export function AppProvider({ children }: { children: ReactNode }) {
       activeId,
       analysed: Object.entries(results).filter(([id, r]) => r && id !== GULFTECH.id).map(([id]) => id),
       history,
+      notices: notices.slice(0, 40),
     });
-  }, [datasets, activeId, results, history]);
+  }, [datasets, activeId, results, history, notices]);
 
   const active = datasets.find((d) => d.id === activeId) ?? datasets[0];
 
-  const toast = useCallback((text: string, tone: Toast["tone"] = "info") => {
-    const id = Date.now() + Math.random();
-    setToasts((t) => [...t, { id, text, tone }]);
-    setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 3600);
+  const dismissPopup = useCallback((id: string) => setPopups((p) => p.filter((x) => x !== id)), []);
+
+  /** adds to the bell feed, pops up immediately, and (if allowed and the tab is hidden) raises a desktop notification */
+  const notify = useCallback((n: NoticeInput) => {
+    const id = `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+    const notice: Notice = { id, tone: n.tone ?? "info", title: n.title, body: n.body, href: n.href, at: new Date().toISOString(), read: false };
+    setNotices((all) => [notice, ...all].slice(0, 40));
+    setPopups((p) => [...p, id].slice(-4));
+    setTimeout(() => setPopups((p) => p.filter((x) => x !== id)), 6000);
+    try {
+      if (typeof Notification !== "undefined" && Notification.permission === "granted" && document.hidden) new Notification(`CashTrap AI · ${n.title}`, { body: n.body, tag: id });
+    } catch { /* desktop notifications are optional */ }
   }, []);
+  const toast = useCallback((text: string, tone: Tone = "info") => notify({ title: text, tone }), [notify]);
+  const markAllRead = useCallback(() => setNotices((all) => all.map((n) => ({ ...n, read: true }))), []);
+  const clearNotices = useCallback(() => { setNotices([]); setPopups([]); }, []);
+  const enableDesktop = useCallback(async () => {
+    if (typeof Notification === "undefined") return;
+    const p = await Notification.requestPermission();
+    setDesktop(p);
+    if (p === "granted") notify({ title: "Desktop notifications on", body: "You'll be alerted here even when this tab is in the background.", tone: "pos" });
+  }, [notify]);
 
   const setActive = useCallback((id: string) => {
     setActiveId(id);
@@ -142,17 +175,19 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setResults((r) => ({ ...r, [active.id]: res }));
       setHistory((h) => h.map((x) => (x.id === active.id ? { ...x, analysedAt: new Date().toISOString() } : x)));
       setStatus("done");
-      toast("Analysis complete", "pos");
+      const sc = res.risk.score;
+      notify({ title: `Analysis complete · ${active.name}`, body: sc == null ? "Not enough data to score. Check the missing fields." : `Risk score ${Math.round(sc)}/100 — ${res.risk.classification}`, tone: sc == null ? "warn" : sc >= 75 ? "crit" : sc >= 50 ? "warn" : "pos", href: "/investment-assessment" });
+      res.alerts.filter((a) => a.severity === "Critical" || a.severity === "High").slice(0, 3).forEach((a, i) => setTimeout(() => notify({ title: `${a.severity} signal · ${a.name}`, body: a.evidence, tone: a.severity === "Critical" ? "crit" : "warn", href: "/investment-assessment" }), 500 * (i + 1)));
     } catch (e) {
       setError(e instanceof Error ? e.message : "Analysis failed");
       setStatus("failed");
       toast("Analysis failed", "crit");
     }
-  }, [active, toast]);
+  }, [active, toast, notify]);
 
   const value = useMemo<Ctx>(
-    () => ({ datasets, active, setActive, addDataset, updateDataset, deleteDataset, history, removeHistory, clearHistory, analysis: results[active.id] ?? null, status, error, runAnalysis, toasts, toast }),
-    [datasets, active, setActive, addDataset, updateDataset, deleteDataset, history, removeHistory, clearHistory, results, status, error, runAnalysis, toasts, toast]
+    () => ({ datasets, active, setActive, addDataset, updateDataset, deleteDataset, history, removeHistory, clearHistory, analysis: results[active.id] ?? null, status, error, runAnalysis, notices, popups, notify, toast, dismissPopup, markAllRead, clearNotices, desktop, enableDesktop }),
+    [datasets, active, setActive, addDataset, updateDataset, deleteDataset, history, removeHistory, clearHistory, results, status, error, runAnalysis, notices, popups, notify, toast, dismissPopup, markAllRead, clearNotices, desktop, enableDesktop]
   );
   return <C.Provider value={value}>{children}</C.Provider>;
 }
