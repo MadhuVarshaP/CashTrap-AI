@@ -73,7 +73,7 @@ function Dashboard({ a }: { a: AnalysisResult }) {
           <span><span className="text-ink3">PERIOD </span>{years}</span>
           <span><span className="text-ink3">LAST RUN </span>{new Date(a.generatedAt).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}</span>
           <Pill tone="pos">● Analysis complete</Pill>
-          {active.synthetic && <Pill tone="warn">Synthetic data</Pill>}
+          {/* {active.synthetic && <Pill tone="warn">Synthetic data</Pill>} */}
         </div>
       </Card>
 

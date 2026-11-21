@@ -73,7 +73,7 @@ function Page({ a }: { a: AnalysisResult }) {
             <Card className="mb-5" hover={false}>
               <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
                 <div>
-                  <div className="mb-2 flex flex-wrap gap-2"><Pill tone="ai"><Sparkles size={11} /> Deterministic demo report</Pill>{active.synthetic && <Pill tone="warn">Synthetic data</Pill>}</div>
+                  {/* <div className="mb-2 flex flex-wrap gap-2"><Pill tone="ai"><Sparkles size={11} /> Deterministic demo report</Pill>{active.synthetic && <Pill tone="warn">Synthetic data</Pill>}</div> */}
                   <h2 className="font-display text-[24px] font-semibold">{active.name}</h2>
                   <div className="mt-2 flex flex-wrap gap-x-6 gap-y-1 font-mono text-[11.5px] text-ink2">
                     <span><span className="text-ink3">PERIOD </span>FY{a.records[0].year}–FY{a.latestRecord.year}</span>

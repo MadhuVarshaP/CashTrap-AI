@@ -54,7 +54,7 @@ const findRow = (rows: Grid, ...res: RegExp[]) => {
 /** column index per year, read from the first header row containing two or more years (FY2024, 31-Dec-2024, …) */
 function yearColumns(rows: Grid): Map<number, number> {
   const cols = new Map<number, number>();
-  for (const row of rows.slice(0, 12)) {
+  for (const row of rows.slice(0, 20)) {
     const hits = row.flatMap((c, i) => { const m = i > 0 ? /(20\d\d)/.exec(String(c ?? "")) : null; return m ? [[Number(m[1]), i] as const] : []; });
     if (hits.length >= 2) { hits.forEach(([y, i]) => cols.set(y, i)); break; }
   }
@@ -129,6 +129,66 @@ function parseStatements(wb: XLSX.WorkBook): ParseResult {
   return { records, errors: [], warnings, notes, meta };
 }
 
+
+// ---------------------------------------------------------------------------
+// Provider exports (e.g. S&P Capital IQ "Financial Highlights"): one sheet, line items
+// down column A, fiscal years across ("2024 FY"), currency and magnitude in the header.
+// ---------------------------------------------------------------------------
+
+function parseWide(wb: XLSX.WorkBook): ParseResult | null {
+  for (const name of wb.SheetNames) {
+    const rows: Grid = XLSX.utils.sheet_to_json<unknown[]>(wb.Sheets[name], { header: 1, defval: null, raw: true });
+    const cols = yearColumns(rows);
+    if (cols.size < 2) continue;
+    const find = (...res: RegExp[]) => findRow(rows, ...res);
+    const revenue = find(/^total revenue/, /^revenue$/, /^(net )?sales/);
+    if (!revenue) continue;
+
+    const head = rows.slice(0, 14).map((r) => String(r[0] ?? "")).join(" | ");
+    const magnitude = /magnitude:\s*billions?/i.test(head) ? 1_000_000_000 : /magnitude:\s*thousands?/i.test(head) ? 1_000 : /magnitude:\s*millions?/i.test(head) || /million|\bdhs?\.?\s*m\b/i.test(head) ? 1_000_000 : 1;
+    const currency = /currency:\s*([^|(]*?)\s*(\((\w{3})\))?\s*(\||$)/i.exec(head)?.[3] ?? "";
+    const title = String(rows.find((r) => /\|/.test(String(r[0] ?? "")))?.[0] ?? "");
+    const meta: ParseMeta = { unitMultiplier: magnitude, synthetic: false, name: title.split("|")[0].trim() || name };
+
+    const gross = find(/^gross profit$/), cogsRow = find(/^(total )?cost of (goods sold|revenue|sales)/);
+    const ebitda = find(/^ebitda$/), ocf = find(/^cash from ops/, /^net cash (from|provided by) operating/);
+    const cash = find(/^cash (&|and) short-term investments/, /^cash\b/), debt = find(/^total debt$/);
+    const dso = find(/^avg\.? days sales out/), dio = find(/^avg\.? days inventory out/), dpo = find(/^avg\.? days payable/);
+    const rec = find(/^(trade )?(accounts )?receivables(, net)?$/), inv = find(/^inventor(y|ies)(, net)?$/), pay = find(/^(trade )?(accounts )?payables$/);
+
+    const years = [...cols.keys()].sort((a, b) => a - b);
+    const days = (row: unknown[] | undefined, y: number) => num(row, cols.get(y));
+    const records: FinancialRecord[] = years.map((y) => {
+      const c = cols.get(y);
+      const rev = num(revenue, c), gp = num(gross, c);
+      const cogs = num(cogsRow, c) != null ? Math.abs(num(cogsRow, c)!) : rev != null && gp != null ? rev - gp : null;
+      const r: FinancialRecord = {
+        year: y, revenue: rev, cogs, ebitda: num(ebitda, c),
+        receivables: num(rec, c), inventory: num(inv, c), payables: num(pay, c),
+        operatingCashFlow: num(ocf, c), cash: num(cash, c), debt: num(debt, c),
+      };
+      // the export has reported days rather than balances: keep the days, and back out an implied balance for display
+      const d = { s: days(dso, y), i: days(dio, y), p: days(dpo, y) };
+      if (d.s != null) { r.reportedDso = d.s; if (r.receivables == null && rev != null) r.receivables = (d.s * rev) / 365; }
+      if (d.i != null) { r.reportedDio = d.i; if (r.inventory == null && cogs != null) r.inventory = (d.i * cogs) / 365; }
+      if (d.p != null) { r.reportedDpo = d.p; if (r.payables == null && cogs != null) r.payables = (d.p * cogs) / 365; }
+      return r;
+    });
+
+    const warnings: string[] = [];
+    const gaps = [["receivables / DSO", dso || rec], ["inventory / DIO", dio || inv], ["payables / DPO", dpo || pay], ["EBITDA", ebitda], ["operating cash flow", ocf], ["cash", cash], ["debt", debt]].filter(([, r]) => !r).map(([n]) => n);
+    if (gaps.length) warnings.push(`Not found in the file: ${gaps.join(", ")}. Dependent indicators will be marked unavailable.`);
+    if (!dpo && !pay) warnings.push("No payables or days-payable data in this export, so DPO and the cash conversion cycle can't be computed.");
+    if (records.some((r) => r.reportedDio == null && r.inventory == null)) warnings.push("Inventory days are 'NA' for some years (service / software business): the inventory indicator is skipped for those years.");
+    if (currency && currency !== "AED") warnings.push(`File currency is ${currency}. Figures are shown as-is and labelled AED: convert first if you need AED.`);
+
+    const notes = [`Provider export detected (${meta.name}): read ${years.length} fiscal years from “${name}” (${magnitude === 1_000_000 ? "millions" : magnitude === 1_000 ? "thousands" : magnitude === 1_000_000_000 ? "billions" : "units"}${currency ? `, ${currency}` : ""}).`,
+      "DSO / DIO are the provider's reported averages; COGS is Revenue − Gross Profit."];
+    return { records, errors: [], warnings, notes, meta };
+  }
+  return null;
+}
+
 export const MAX_FILE_BYTES = 5 * 1024 * 1024;
 
 function finish(r: ParseResult): ParseResult {
@@ -145,6 +205,8 @@ export async function parseFinancialFile(file: File): Promise<ParseResult> {
   try {
     const wb = XLSX.read(await file.arrayBuffer(), { type: "array" });
     if (isStatementWorkbook(wb)) return finish(parseStatements(wb));
+    const hasYearHeader = wb.SheetNames.some((n) => Object.keys(XLSX.utils.sheet_to_json<Record<string, unknown>>(wb.Sheets[n], { defval: null })[0] ?? {}).some((h) => ALIASES[norm(h)] === "year"));
+    if (!hasYearHeader) { const wide = parseWide(wb); if (wide) return finish(wide); }
     // flat table: use the first sheet that has a Year column
     const sheetRows = (n: string) => XLSX.utils.sheet_to_json<Record<string, unknown>>(wb.Sheets[n], { defval: null, raw: true });
     const withYear = wb.SheetNames.find((n) => Object.keys(sheetRows(n)[0] ?? {}).some((h) => ALIASES[norm(h)] === "year"));
@@ -157,7 +219,7 @@ export async function parseFinancialFile(file: File): Promise<ParseResult> {
   const colMap: Record<string, Col> = {};
   for (const h of Object.keys(rows[0])) if (ALIASES[norm(h)]) colMap[h] = ALIASES[norm(h)];
   const found = new Set(Object.values(colMap));
-  if (!found.has("year")) return { records: [], errors: ["Missing required column: Year. Upload a flat table (Year, Revenue, COGS, …) or a workbook with “Income Statement” and “Balance Sheet” sheets."], warnings };
+  if (!found.has("year")) return { records: [], errors: ["Missing required column: Year. Upload a flat table (Year, Revenue, COGS, …), a workbook with “Income Statement” and “Balance Sheet” sheets, or an S&P Capital IQ Financial Highlights export."], warnings };
   const absent = (["revenue", "cogs", "ebitda", "receivables", "inventory", "payables", "operatingCashFlow", "cash", "debt"] as const).filter((f) => !found.has(f));
   if (absent.length) warnings.push(`Columns not found: ${absent.join(", ")}. Dependent indicators will be marked unavailable.`);
 

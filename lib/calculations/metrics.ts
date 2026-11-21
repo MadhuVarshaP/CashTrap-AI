@@ -15,9 +15,11 @@ export function computeMetrics(records: FinancialRecord[]): YearMetrics[] {
     const p = i > 0 ? rs[i - 1] : undefined;
     const open = (f: "receivables" | "inventory" | "payables"): Num => (p ? p[f] : r.opening?.[f] ?? null);
     // credit sales / credit purchases are preferred over revenue / COGS when supplied
-    const dso = mul(div(avg(r.receivables, open("receivables")), r.creditSales ?? r.revenue), 365);
-    const dio = mul(div(avg(r.inventory, open("inventory")), r.cogs), 365);
-    const dpo = mul(div(avg(r.payables, open("payables")), r.creditPurchases ?? r.cogs), 365);
+    // provider-reported days (S&P Capital IQ) take precedence: their balances are not in the file
+    const dso = r.reportedDso ?? mul(div(avg(r.receivables, open("receivables")), r.creditSales ?? r.revenue), 365);
+    const dio = r.reportedDio ?? mul(div(avg(r.inventory, open("inventory")), r.cogs), 365);
+    const dpo = r.reportedDpo ?? mul(div(avg(r.payables, open("payables")), r.creditPurchases ?? r.cogs), 365);
+    const reported = r.reportedDso != null || r.reportedDio != null;
     const ccc = dso != null && dio != null && dpo != null ? dso + dio - dpo : null;
     const netDebt = r.debt != null && r.cash != null ? r.debt - r.cash : null;
     return {
@@ -30,7 +32,7 @@ export function computeMetrics(records: FinancialRecord[]): YearMetrics[] {
       ebitdaMargin: div(r.ebitda, r.revenue),
       netDebt,
       netDebtToEbitda: netDebt != null && r.ebitda != null && r.ebitda > 0 ? netDebt / r.ebitda : null,
-      approximate: !p && !r.opening,
+      approximate: !p && !r.opening && !reported,
     };
   });
 }

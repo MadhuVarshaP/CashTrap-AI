@@ -16,6 +16,10 @@ export interface FinancialRecord {
   creditPurchases?: Num;
   /** optional: prior-year closing balances so the first year can use averages */
   opening?: { receivables: Num; inventory: Num; payables: Num };
+  /** optional: days metrics reported by a data provider (e.g. S&P Capital IQ); used when balances can't be averaged */
+  reportedDso?: Num;
+  reportedDio?: Num;
+  reportedDpo?: Num;
 }
 
 export type FieldKey = "revenue" | "cogs" | "ebitda" | "receivables" | "inventory" | "payables" | "operatingCashFlow" | "cash" | "debt";

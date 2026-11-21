@@ -47,7 +47,7 @@ export default function CompanyAnalysis() {
 
   return (
     <>
-      <PageTitle title="Company Analysis" sub="Upload financial statements, validate the records, then run the analysis." right={<Pill tone={active.synthetic ? "warn" : "accent"}>{active.synthetic ? "Synthetic demo" : "Uploaded data"}</Pill>} />
+      {/* <PageTitle title="Company Analysis" sub="Upload financial statements, validate the records, then run the analysis." right={<Pill tone={active.synthetic ? "warn" : "accent"}>{active.synthetic ? "" : "Uploaded data"}</Pill>} /> */}
 
       <div className="grid gap-5 xl:grid-cols-12">
         <Card className="xl:col-span-7">

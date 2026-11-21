@@ -54,7 +54,7 @@ export function Header() {
           </div>
         </div>
         <div className="flex items-center gap-2 sm:gap-3">
-          {active.synthetic && <Pill tone="warn" className="hidden md:inline-flex">● Demo data · synthetic</Pill>}
+          {/* {active.synthetic && <Pill tone="warn" className="hidden md:inline-flex">● Demo data · synthetic</Pill>} */}
           <div ref={selRef} className="relative">
             <button onClick={() => setSel(!sel)} className="flex h-10 items-center gap-2 rounded-xl border border-line bg-card px-3 text-[12.5px] hover:border-[#3f4551]" aria-haspopup="listbox" aria-expanded={sel}>
               <Building2 size={15} className="text-ink3" />
@@ -77,7 +77,7 @@ export function Header() {
                       ) : (
                         <div className="flex items-center gap-1 rounded-xl hover:bg-card">
                           <button onClick={() => { setActive(d.id); setSel(false); toast(`Switched to ${d.name}`); }} className="flex min-w-0 flex-1 items-center justify-between gap-2 rounded-xl px-3 py-2.5 text-left text-[13px]">
-                            <span className="min-w-0"><span className="block truncate">{d.name}</span><span className="block font-mono text-[10px] text-ink3">{d.id === "gulftech-demo" ? "SYNTHETIC DEMO · BUILT-IN" : `UPLOADED · ${d.fileName ?? ""}`}</span></span>
+                            <span className="min-w-0"><span className="block truncate">{d.name}</span><span className="block font-mono text-[10px] text-ink3">{d.id === "gulftech-demo" ? "" : `UPLOADED · ${d.fileName ?? ""}`}</span></span>
                             {d.id === active.id && <Check size={15} className="shrink-0 text-accent" />}
                           </button>
                           {d.id !== "gulftech-demo" && (
