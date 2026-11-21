@@ -2,7 +2,7 @@
 
 import clsx from "clsx";
 import { AnimatePresence, motion } from "framer-motion";
-import { Bell, Building2, Check, ChevronDown, Search } from "lucide-react";
+import { Bell, Building2, Check, ChevronDown, Search, Trash2 } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { useApp } from "@/lib/state/store";
@@ -23,7 +23,8 @@ function useOutside(fn: () => void) {
 export function Header() {
   const path = usePathname();
   const router = useRouter();
-  const { datasets, active, setActive, analysis, toast } = useApp();
+  const { datasets, active, setActive, deleteDataset, analysis, toast } = useApp();
+  const [confirm, setConfirm] = useState<string | null>(null);
   const [sel, setSel] = useState(false);
   const [cmd, setCmd] = useState(false);
   const [bell, setBell] = useState(false);
@@ -65,10 +66,25 @@ export function Header() {
                 <motion.ul initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} className="absolute right-0 top-12 z-50 w-72 rounded-2xl border border-line bg-elev p-1.5 shadow-2xl" role="listbox">
                   {datasets.map((d) => (
                     <li key={d.id}>
-                      <button onClick={() => { setActive(d.id); setSel(false); toast(`Switched to ${d.name}`); }} className="flex w-full items-center justify-between gap-2 rounded-xl px-3 py-2.5 text-left text-[13px] hover:bg-card">
-                        <span className="min-w-0"><span className="block truncate">{d.name}</span><span className="block font-mono text-[10px] text-ink3">{d.synthetic ? "SYNTHETIC DEMO" : `UPLOADED · ${d.fileName ?? ""}`}</span></span>
-                        {d.id === active.id && <Check size={15} className="text-accent" />}
-                      </button>
+                      {confirm === d.id ? (
+                        <div className="rounded-xl bg-crit/10 p-3 text-[12.5px]">
+                          <p className="mb-2 text-ink">Delete <span className="font-medium">{d.name}</span>? Its data is removed from this browser. A record stays in upload history.</p>
+                          <div className="flex gap-2">
+                            <button onClick={() => { deleteDataset(d.id); setConfirm(null); setSel(false); toast(`Deleted ${d.name}`, "warn"); }} className="min-h-[36px] flex-1 rounded-lg bg-crit px-3 font-medium text-white">Delete</button>
+                            <button onClick={() => setConfirm(null)} className="min-h-[36px] flex-1 rounded-lg border border-line px-3 text-ink2 hover:bg-card">Cancel</button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-1 rounded-xl hover:bg-card">
+                          <button onClick={() => { setActive(d.id); setSel(false); toast(`Switched to ${d.name}`); }} className="flex min-w-0 flex-1 items-center justify-between gap-2 rounded-xl px-3 py-2.5 text-left text-[13px]">
+                            <span className="min-w-0"><span className="block truncate">{d.name}</span><span className="block font-mono text-[10px] text-ink3">{d.id === "gulftech-demo" ? "SYNTHETIC DEMO · BUILT-IN" : `UPLOADED · ${d.fileName ?? ""}`}</span></span>
+                            {d.id === active.id && <Check size={15} className="shrink-0 text-accent" />}
+                          </button>
+                          {d.id !== "gulftech-demo" && (
+                            <button onClick={() => setConfirm(d.id)} aria-label={`Delete ${d.name}`} title="Delete this company" className="mr-1 grid h-9 w-9 shrink-0 place-items-center rounded-lg text-ink3 hover:bg-crit/10 hover:text-crit"><Trash2 size={15} /></button>
+                          )}
+                        </div>
+                      )}
                     </li>
                   ))}
                   <li><button onClick={() => { router.push("/company-analysis"); setSel(false); }} className="w-full rounded-xl px-3 py-2.5 text-left text-[12.5px] text-accent hover:bg-card">+ Upload a company…</button></li>
