@@ -1,5 +1,6 @@
 import type { AnalysisResult } from "@/types/finance";
 import { cashRelease } from "@/lib/calculations/metrics";
+import { allIndicators } from "@/lib/calculations/pe-risk";
 import { fmtDays, fmtM, fmtPct, fmtX, growth } from "@/lib/utilities/format";
 
 export const suggestions = (a: AnalysisResult | null) => [
@@ -23,7 +24,7 @@ const pct = (g: number | null) => (g == null ? "n/a" : `${g >= 0 ? "+" : ""}${(g
 const NEED = "Needs a completed analysis. Open **Company Analysis**, pick data and press **Run analysis**.";
 const SCEN = [{ name: "Conservative", cut: 8 }, { name: "Base", cut: 15 }, { name: "Optimistic", cut: 25 }];
 /** which risk indicator (and so which weight) each signal belongs to */
-const SIGNAL_INDICATOR: Record<string, string> = { "rec-vs-rev": "receivables", "dso-up": "receivables", "inv-vs-rev": "inventory", "dio-up": "inventory", "ebitda-ocf": "divergence", "ccc-up": "ccc", leverage: "leverage" };
+const SIGNAL_INDICATOR: Record<string, string> = { "rec-vs-rev": "revq", "dso-up": "dso", "inv-vs-rev": "dio", "dio-up": "dio", "ebitda-ocf": "ocf", "ccc-up": "owc", leverage: "lev" };
 const SIGNALS = [
   { id: "rec-vs-rev", name: "Receivables growing faster than revenue", group: "Receivables" }, { id: "dso-up", name: "DSO is increasing", group: "Receivables" },
   { id: "inv-vs-rev", name: "Inventory growing faster than revenue", group: "Inventory" }, { id: "dio-up", name: "DIO is increasing", group: "Inventory" },
@@ -39,14 +40,16 @@ function chipAnswer(q: string, name: string, a: AnalysisResult | null): string |
   const { risk: rk, latest: L, previous: P, latestRecord: c, previousRecord: pr } = a;
   const rg = growth(c.revenue, pr?.revenue ?? null);
   const sc = rk.score == null ? "insufficient data" : `${Math.round(rk.score)}/100 (${rk.classification})`;
-  const ranked = [...rk.categories].filter((x) => x.points != null).sort((x, y) => (y.points! / y.max) - (x.points! / x.max) || y.max - x.max);
+  const INDS = allIndicators(rk);
+  const weightOf = (alertId: string) => INDS.find((k) => k.id === SIGNAL_INDICATOR[alertId])?.max ?? 0;
+  const ranked = INDS.filter((x) => x.points != null).sort((x, y) => (y.points ?? 0) - (x.points ?? 0) || (y.points! / y.max) - (x.points! / x.max));
 
   if (w(/worth it|should we invest|good investment/)) {
-    const verify = [...a.alerts].sort((x, y) => (rk.categories.find((k) => k.id === SIGNAL_INDICATOR[y.id])?.max ?? 0) - (rk.categories.find((k) => k.id === SIGNAL_INDICATOR[x.id])?.max ?? 0)).flatMap((x) => x.investigate).filter((v, i, arr) => arr.indexOf(v) === i).slice(0, 3);
-    return `I can't tell you whether ${name} is worth it. This tool screens cash-conversion risk and is **not a verdict**; price, strategy, growth and management are outside it.\n\n**Score:** ${sc}.\n**Top three drivers:**\n` + ranked.slice(0, 3).map((x) => `• **${x.name}** ${x.points}/${x.max} (${x.severity})`).join("\n") + `\n\n**Verify first:**\n` + (verify.length ? verify.map((v) => `• ${v}`).join("\n") : "• No signals fired: confirm the data with a quality-of-earnings review.");
+    const verify = [...a.alerts].sort((x, y) => weightOf(y.id) - weightOf(x.id)).flatMap((x) => x.investigate).filter((v, i, arr) => arr.indexOf(v) === i).slice(0, 3);
+    return `I can't tell you whether ${name} is worth it. This tool screens cash-conversion risk and is **not a verdict**; price, strategy, growth and management are outside it.\n\n**Score:** ${sc}.\n**Top three drivers:**\n` + ranked.slice(0, 3).map((x) => `• **${x.name}** ${x.points}/${x.max} (${x.level})`).join("\n") + `\n\n**Verify first:**\n` + (verify.length ? verify.map((v) => `• ${v}`).join("\n") : "• No signals fired: confirm the data with a quality-of-earnings review.");
   }
   if (w(/why is the (risk )?score/)) {
-    return `**${name}: ${sc}.** Points earned against each indicator's maximum:\n` + rk.categories.map((x) => `• **${x.name}:** ${x.points == null ? "not evaluated (data missing)" : `${x.points}/${x.max}`}`).join("\n") + `\n\nTotal ${rk.rawPoints}/${rk.maxEvaluated} evaluated points${rk.maxEvaluated < 100 ? `, rescaled to 100 (${rk.evaluated} of ${rk.total} indicators evaluated)` : ""}. Bands: 0–24 Low, 25–49 Moderate, 50–74 High, 75–100 Critical.`;
+    return `**${name}: ${sc}.** Points earned against each indicator's maximum:\n` + rk.categories.map((p) => `**${p.name}** (${p.weight} pts weight): ${p.points == null ? "not assessed" : `${p.points}/${p.max}`}\n` + p.indicators.map((x) => `   • ${x.name}: ${x.points == null ? "not assessed" : `${x.points}/${x.max}`}`).join("\n")).join("\n") + `\n\nTotal ${rk.rawPoints}/${rk.maxEvaluated} assessable points${rk.maxEvaluated < 100 ? ` (${rk.coverage}% of the model had data)` : ""}. Bands: 0–24 Low, 25–49 Moderate, 50–74 High, 75–100 Critical.`;
   }
   if (w(/signals are the same|same signals/)) {
     const on = new Set(a.alerts.map((x) => x.id));
@@ -78,10 +81,10 @@ function chipAnswer(q: string, name: string, a: AnalysisResult | null): string |
     return `Now: net debt ${fmtM(L.netDebt)}, EBITDA ${fmtM(c.ebitda)} → **${fmtX(L.netDebtToEbitda)}**.\n\nNew net debt / EBITDA if the release repays debt:\n` + SCEN.map((x) => { const r = cashRelease(base, L.dso!, Math.max(0, L.dso! - x.cut)); return `• **${x.name}:** (${fmtM(L.netDebt)} − ${fmtM(r)}) ÷ ${fmtM(c.ebitda)} = **${fmtX((L.netDebt! - r) / c.ebitda!)}**`; }).join("\n") + `\n\n**Assumption:** the whole one-off release is used to repay debt, with EBITDA and everything else unchanged.`;
   }
   if (w(/management/)) {
-    const wt = (id: string) => rk.categories.find((k) => k.id === SIGNAL_INDICATOR[id])?.max ?? 0;
+    const wt = weightOf;
     const items = [...a.alerts].sort((x, y) => wt(y.id) - wt(x.id)).flatMap((x) => x.investigate.map((i) => ({ i, id: x.id }))).filter((v, k, arr) => arr.findIndex((o) => o.i === v.i) === k).slice(0, 3);
     if (!items.length) return "No signals fired, so there are no targeted questions. Ask for a standard working-capital and quality-of-earnings walk-through.";
-    return "First three questions, ranked by the weight of the indicator behind them:\n" + items.map((x, n) => `${n + 1}. **Please provide / explain: ${x.i}** (${rk.categories.find((k) => k.id === SIGNAL_INDICATOR[x.id])?.name}, ${wt(x.id)} pts)`).join("\n") + "\n\nThe full list is in section 9 of the **Due Diligence Report**.";
+    return "First three questions, ranked by the weight of the indicator behind them:\n" + items.map((x, n) => `${n + 1}. **Please provide / explain: ${x.i}** (${INDS.find((k) => k.id === SIGNAL_INDICATOR[x.id])?.name}, ${wt(x.id)} pts)`).join("\n") + "\n\nThe full list is in section 9 of the **Due Diligence Report**.";
   }
   // missing information
   return `**Data gaps:** ${a.missingFields.length ? a.missingFields.slice(0, 12).join(", ") + (a.missingFields.length > 12 ? ` and ${a.missingFields.length - 12} more` : "") : "none in the supplied fields"}. Dependent indicators are marked unavailable, never zero${rk.evaluated < rk.total ? ` (${rk.total - rk.evaluated} of ${rk.total} indicators couldn't be scored)` : ""}.\n\n**Limits of annual, year-end figures:**\n• ${a.records.length} annual periods; no quarterly or seasonal data.\n• Year-end balances can hide intra-year swings.\n• ${a.metrics.some((x) => x.approximate) ? "The earliest year uses closing balances only (approximate)." : "Average balances were used throughout."}\n• ${c.creditSales == null ? "Credit sales/purchases weren't supplied, so revenue and COGS are proxies." : "Credit sales/purchases were supplied and used."}`;
@@ -99,7 +102,7 @@ export function localAnswer(question: string, name: string, a: AnalysisResult | 
   if (has(q, "upload", "file", "import", "csv", "xlsx", "excel", "format"))
     return "Go to **Company Analysis** and drop a file in the upload box. Accepted: a flat table (Year, Revenue, COGS, EBITDA, Receivables, Inventory, Payables, Operating_Cash_Flow, Cash, Debt), a workbook with *Income Statement* + *Balance Sheet* sheets, or an **S&P Capital IQ Financial Highlights** export. Max 5 MB, at least two years. Then press **Run analysis**.";
   if (has(q, "weight", "split", "100 pt", "points"))
-    return "The 100 points are split unequally by how much each signal says about cash risk: **Profit-to-cash 25**, **Receivables 20**, **EBITDA vs OCF divergence 20**, **Inventory 15**, **Cash conversion cycle 10**, **Leverage 10**. They sum to 100, so points = %. If an indicator can't be computed, the rest are rescaled to 100%. Full detail is in *Methodology* and docs/CALCULATIONS.md.";
+    return "The 100 points sit across five pillars: **Quality of Earnings 25**, **Cash Flow Sustainability 25**, **Working Capital 20**, **Debt and Repayment 20**, **Liquidity and Stress 10**. Each pillar splits into indicators (18 in total) with their own maximums, e.g. EBITDA-to-cash conversion 10, receivables 7, net debt/EBITDA 7. An indicator without data is **not assessed** (never zero) and the score is points earned ÷ points assessable. Detail is in the *Indicator register* tab and docs/CALCULATIONS.md.";
   if (has(q, "dso", "dio", "dpo", "ccc", "days", "cycle", "working capital")) {
     const base = "**DSO** = avg receivables ÷ credit sales × 365 (how long customers take to pay). **DIO** = avg inventory ÷ COGS × 365 (how long stock sits). **DPO** = avg payables ÷ COGS × 365 (how long you take to pay suppliers). **CCC** = DSO + DIO − DPO: the days cash is tied up.";
     return a ? `${base}\n\nFor **${name}** (FY${a.latest.year}): DSO ${fmtDays(a.latest.dso)}, DIO ${fmtDays(a.latest.dio)}, DPO ${fmtDays(a.latest.dpo)}, CCC ${fmtDays(a.latest.ccc)}.` : base;
@@ -127,8 +130,8 @@ export function localAnswer(question: string, name: string, a: AnalysisResult | 
   if (has(q, "recommend", "invest", "should", "verdict", "decision", "conclusion"))
     return `${name} screens as **${rk.classification}**${rk.score != null ? ` (${Math.round(rk.score)}/100)` : ""}. ${rk.classification === "High Risk" || rk.classification === "Critical Risk" ? "I'd hold the investment decision until the flagged items are explained (ageing, stock, collections)." : "No major cash trap shows up in the numbers, but confirm with detailed diligence."} This is a screening aid, not investment advice. See **Due Diligence Report** for the full write-up.`;
   if (has(q, "why", "score", "risk", "rating", "classif", "breakdown", "driver")) {
-    const top = [...rk.categories].filter((c) => c.points != null).sort((x, y) => (y.points ?? 0) / y.max - (x.points ?? 0) / x.max).slice(0, 3);
-    return `**${name}: ${rk.score == null ? "insufficient data" : `${Math.round(rk.score)}/100, ${rk.classification}`}** (${rk.evaluated} of ${rk.total} indicators evaluated${a.previousScore != null ? `; previously ${Math.round(a.previousScore)}` : ""}).\nBiggest drivers:\n` + top.map((c) => `• **${c.name}** ${c.points}/${c.max} (${c.severity}): ${c.evidence}`).join("\n");
+    const top = allIndicators(rk).filter((x) => x.points != null).sort((x, y) => (y.points ?? 0) - (x.points ?? 0)).slice(0, 3);
+    return `**${name}: ${rk.score == null ? "insufficient data" : `${Math.round(rk.score)}/100, ${rk.classification}`}** (${rk.evaluated} of ${rk.total} indicators assessed, ${rk.coverage}% of the model${a.previousScore != null ? `; previously ${Math.round(a.previousScore)}` : ""}).\nBiggest drivers:\n` + top.map((c) => `• **${c.name}** ${c.points}/${c.max} (${c.level}): ${c.actual}`).join("\n");
   }
   if (has(q, "revenue", "sales", "growth", "margin"))
     return `FY${L.year} revenue is **${fmtM(a.latestRecord.revenue)}**${P && a.previousRecord?.revenue ? `, vs ${fmtM(a.previousRecord.revenue)} in FY${P.year}` : ""}. EBITDA margin ${fmtPct(L.ebitdaMargin)}.`;

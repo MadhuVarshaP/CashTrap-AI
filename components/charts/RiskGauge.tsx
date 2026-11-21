@@ -9,6 +9,7 @@ export const riskColor = (score: number | null) => (score == null ? "#707681" : 
 /** 270° arc gauge with threshold ticks at 25 / 50 / 75. */
 export function RiskGauge({ risk, size = 220 }: { risk: RiskResult; size?: number }) {
   const r = 84, c = 2 * Math.PI * r, arc = c * 0.75;
+  const k = size / 220; // text scales with the gauge so small gauges don't overflow
   const score = risk.score;
   const color = riskColor(score);
   const tick = (v: number) => {
@@ -27,14 +28,14 @@ export function RiskGauge({ risk, size = 220 }: { risk: RiskResult; size?: numbe
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
         {score == null ? (
-          <span className="px-6 text-center font-display text-lg font-semibold text-ink2">Insufficient data</span>
+          <span className="px-4 text-center font-display font-semibold text-ink2" style={{ fontSize: Math.max(11, 18 * k) }}>Insufficient data</span>
         ) : (
           <>
-            <CountNum value={score} className="font-display text-[56px] font-semibold leading-none" />
-            <span className="mt-1 font-mono text-[11px] text-ink3">/ 100</span>
+            <CountNum value={score} className="font-display font-semibold leading-none" style={{ fontSize: 56 * k }} />
+            <span className="font-mono text-ink3" style={{ fontSize: Math.max(8, 11 * k), marginTop: 4 * k }}>/ 100</span>
           </>
         )}
-        <span className="mt-2 rounded-full border px-2.5 py-0.5 font-mono text-[10px] uppercase tracking-wider" style={{ color, borderColor: color + "55", background: color + "14" }}>{risk.classification}</span>
+        <span className="rounded-full border font-mono uppercase tracking-wider" style={{ color, borderColor: color + "55", background: color + "14", marginTop: 8 * k, padding: `${2 * k}px ${10 * k}px`, fontSize: Math.max(7.5, 10 * k) }}>{size >= 150 ? risk.classification : risk.classification.replace(" Risk", "")}</span>
       </div>
     </div>
   );

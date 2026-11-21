@@ -42,7 +42,7 @@ export default function CompanyAnalysis() {
   const preview = useMemo(() => analyze(active), [active]);
   const label = (k: string) => COLS.find((c) => c.key === k)?.label ?? k;
   const gaps = Object.entries(dq.missing.reduce<Record<string, number[]>>((m, x) => ((m[x.field] ??= []).push(x.year), m), {}));
-  const off = preview?.risk.categories.filter((c) => c.points == null) ?? [];
+  const off = preview?.risk.categories.flatMap((c) => c.indicators).filter((i) => i.points == null) ?? [];
   const warnings: string[] = [];
   if (dq.missing.length) warnings.push(`${dq.missing.length} missing value${dq.missing.length > 1 ? "s" : ""}: dependent indicators will be marked unavailable, not zero.`);
   if (active.records.length < 2) warnings.push("At least two years are needed to assess trends.");
@@ -95,8 +95,8 @@ export default function CompanyAnalysis() {
                 </ul>
                 <p className="mt-3 text-ink2">
                   {!preview ? "At least two years are needed before analysis can run."
-                    : preview.risk.insufficient ? <span className="text-crit">Analysis will run but the score will read “Insufficient data”: only {preview.risk.evaluated} of {preview.risk.total} indicators can be computed and at least 4 are needed.</span>
-                    : <>You can still run the analysis. <span className="text-ink">{preview.risk.evaluated} of {preview.risk.total}</span> indicators can be computed{off.length ? `; not available: ${off.map((c) => c.name).join(", ")}` : ""}. The score is rescaled over the indicators that are available.</>}
+                    : preview.risk.insufficient ? <span className="text-crit">Analysis will run but the score will read “Insufficient data”: only {preview.risk.coverage}% of the 100-point model can be assessed and at least 40% is needed.</span>
+                    : <>You can still run the analysis. <span className="text-ink">{preview.risk.evaluated} of {preview.risk.total}</span> risk indicators ({preview.risk.coverage}% of the model) can be assessed{off.length ? `; not assessed: ${off.slice(0, 5).map((c) => c.name).join(", ")}${off.length > 5 ? ` and ${off.length - 5} more` : ""}` : ""}. The score uses only the indicators that can be assessed.</>}
                 </p>
                 <p className="mt-2 text-ink3">Fill a value in the table below (click “missing”) to switch an indicator back on.</p>
               </div>

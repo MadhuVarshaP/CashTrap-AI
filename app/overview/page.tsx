@@ -105,12 +105,12 @@ function Dashboard({ a }: { a: AnalysisResult }) {
         <Card className="xl:col-span-4">
           <CardHead title="Risk snapshot" hint="Weighted screening score. Higher = more identified financial risk. A prototype methodology, not an investment verdict." right={<Link href="/investment-assessment" className="text-[12px] text-accent hover:underline">Detail →</Link>} />
           <RiskGauge risk={a.risk} />
-          <div className="mt-4 text-center font-mono text-[11px] text-ink3">COVERAGE {a.risk.evaluated}/{a.risk.total} INDICATORS{a.risk.evaluated < a.risk.total && <span className="text-warn"> · INCOMPLETE</span>}</div>
+          <div className="mt-4 text-center font-mono text-[11px] text-ink3">COVERAGE {a.risk.coverage}% OF MODEL · {a.risk.evaluated}/{a.risk.total} INDICATORS{a.risk.coverage < 100 && <span className="text-warn"> · INCOMPLETE</span>}</div>
           <div className="mt-4 space-y-2.5">
             {a.risk.categories.map((c) => (
               <div key={c.id}>
                 <div className="mb-1 flex justify-between text-[11.5px] text-ink2"><span>{c.name}</span><span className="font-mono text-ink3">{c.points == null ? "n/a" : `${c.points}/${c.max}`}</span></div>
-                <Bar value={c.points ?? 0} max={c.max} color={c.points == null ? "#3a3f49" : riskColor((c.points / c.max) * 100)} className="h-1.5" />
+                <Bar value={c.points ?? 0} max={c.max} color={c.points == null ? "#3a3f49" : riskColor((c.points / (c.max || 1)) * 100)} className="h-1.5" />
               </div>
             ))}
           </div>
@@ -173,7 +173,7 @@ function Dashboard({ a }: { a: AnalysisResult }) {
         <div className="grid gap-4 sm:grid-cols-2 xl:col-span-12 xl:grid-cols-4">
           {[
             { href: "/company-analysis", t: "Analyse financials", d: "Review records & data quality", i: Table2 },
-            { href: "/investment-assessment", t: "Investment assessment", d: `Score ${a.risk.score ?? "n/a"}/100 · ${a.risk.classification}`, i: Gauge },
+            { href: "/investment-assessment", t: "Investment risk analysis", d: `Score ${a.risk.score ?? "n/a"}/100 · ${a.risk.classification}`, i: Gauge },
             { href: "/cash-impact", t: "Run cash-release scenarios", d: "Model DSO improvement in AED", i: Calculator },
             { href: "/due-diligence-report", t: "Generate DD report", d: "11-section investment report", i: FileText },
           ].map((q) => (

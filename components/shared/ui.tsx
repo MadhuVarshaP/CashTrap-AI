@@ -90,9 +90,9 @@ export function Money({ value, decimals = 1, prefix = "AED ", suffix = "m", clas
   return <span className={clsx("tabular-nums", className)}>{prefix}{sc.n}{sc.unit}</span>;
 }
 
-export function CountNum({ value, decimals = 0, suffix = "", className }: { value: number; decimals?: number; suffix?: string; className?: string }) {
+export function CountNum({ value, decimals = 0, suffix = "", className, style }: { value: number; decimals?: number; suffix?: string; className?: string; style?: React.CSSProperties }) {
   const v = useCountUp(value);
-  return <span className={clsx("tabular-nums", className)}>{v.toFixed(decimals)}{suffix}</span>;
+  return <span className={clsx("tabular-nums", className)} style={style}>{v.toFixed(decimals)}{suffix}</span>;
 }
 
 export function Spark({ data, color }: { data: number[]; color: string }) {
