@@ -42,7 +42,7 @@ export default function CompanyAnalysis() {
   if (active.records.length < 2) warnings.push("At least two years are needed to assess trends.");
   if (active.records.length < 3) warnings.push("Fewer than three years limits trend reliability.");
   if (active.records.some((r) => r.ebitda != null && r.ebitda <= 0)) warnings.push("Non-positive EBITDA: cash conversion and leverage ratios are not meaningful for those years.");
-  if (active.records[0] && !active.records[0].opening) warnings.push("First-year DSO/DIO/DPO use closing balances only unless opening balances were supplied.");
+  if (active.records[0] && !active.records[0].opening && active.records[0].reportedDso == null) warnings.push("First-year DSO/DIO/DPO use closing balances only unless opening balances were supplied.");
   const ready = active.records.length >= 2;
 
   return (
