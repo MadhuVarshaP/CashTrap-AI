@@ -5,7 +5,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { Bot, Send, Sparkles, X } from "lucide-react";
 import { Fragment, useEffect, useRef, useState } from "react";
 import { buildContext } from "@/lib/chat/context";
-import { SUGGESTIONS, localAnswer } from "@/lib/chat/local";
+import { localAnswer, suggestions } from "@/lib/chat/local";
 import { useApp } from "@/lib/state/store";
 
 interface Msg { role: "user" | "assistant"; content: string }
@@ -80,7 +80,7 @@ export function ChatWidget() {
               {msgs.length === 0 && (
                 <div>
                   <p className="text-[13px] leading-relaxed text-ink2">Ask about <span className="text-ink">{active.name}</span>: the risk score, red flags, working-capital days, cash conversion or how anything is calculated.</p>
-                  <div className="mt-3 flex flex-wrap gap-2">{SUGGESTIONS.map((s) => <button key={s} onClick={() => send(s)} className="rounded-full border border-line bg-card px-3 py-1.5 text-left text-[12px] text-ink2 hover:border-accent hover:text-ink">{s}</button>)}</div>
+                  <div className="mt-3 flex flex-wrap gap-2">{suggestions(analysis).map((s) => <button key={s} onClick={() => send(s)} className="rounded-full border border-line bg-card px-3 py-1.5 text-left text-[12px] text-ink2 hover:border-accent hover:text-ink">{s}</button>)}</div>
                 </div>
               )}
               {msgs.map((m, i) => (

@@ -1,11 +1,91 @@
 import type { AnalysisResult } from "@/types/finance";
 import { cashRelease } from "@/lib/calculations/metrics";
-import { fmtDays, fmtM, fmtPct, fmtX } from "@/lib/utilities/format";
+import { fmtDays, fmtM, fmtPct, fmtX, growth } from "@/lib/utilities/format";
 
-export const SUGGESTIONS = ["Why is the risk score what it is?", "What are the biggest red flags?", "Explain DSO, DIO and DPO", "How much cash could we release?", "How are the weights split?", "How do I upload a file?"];
+export const suggestions = (a: AnalysisResult | null) => [
+  "Is this investment worth it?",
+  `Why is the risk score ${a?.risk.score != null ? Math.round(a.risk.score) : "what it is"}?`,
+  "Which signals are the same?",
+  "Is the DSO increase a concern?",
+  "Is the DIO increase a concern?",
+  "What does the cash conversion cycle mean?",
+  "How much cash could be released?",
+  "How would that change leverage?",
+  "What should we ask management?",
+  "What information is missing?",
+];
 
 const has = (q: string, ...w: string[]) => w.some((x) => q.includes(x));
 const sev = { Critical: "🔴", High: "🟠", Medium: "🟡", Low: "🟢" } as const;
+
+
+const pct = (g: number | null) => (g == null ? "n/a" : `${g >= 0 ? "+" : ""}${(g * 100).toFixed(1)}%`);
+const NEED = "Needs a completed analysis. Open **Company Analysis**, pick data and press **Run analysis**.";
+const SCEN = [{ name: "Conservative", cut: 8 }, { name: "Base", cut: 15 }, { name: "Optimistic", cut: 25 }];
+/** which risk indicator (and so which weight) each signal belongs to */
+const SIGNAL_INDICATOR: Record<string, string> = { "rec-vs-rev": "receivables", "dso-up": "receivables", "inv-vs-rev": "inventory", "dio-up": "inventory", "ebitda-ocf": "divergence", "ccc-up": "ccc", leverage: "leverage" };
+const SIGNALS = [
+  { id: "rec-vs-rev", name: "Receivables growing faster than revenue", group: "Receivables" }, { id: "dso-up", name: "DSO is increasing", group: "Receivables" },
+  { id: "inv-vs-rev", name: "Inventory growing faster than revenue", group: "Inventory" }, { id: "dio-up", name: "DIO is increasing", group: "Inventory" },
+  { id: "ebitda-ocf", name: "EBITDA rising while operating cash flow declines", group: "Profit-to-cash" }, { id: "ccc-up", name: "Cash conversion cycle is lengthening", group: "Profit-to-cash" }, { id: "leverage", name: "High net debt relative to EBITDA", group: "Profit-to-cash" },
+];
+
+/** the ten suggested questions, each answered from the engine's own numbers; null = not a chip question */
+function chipAnswer(q: string, name: string, a: AnalysisResult | null): string | null {
+  const w = (re: RegExp) => re.test(q);
+  const isChip = w(/worth it|should we invest|good investment/) || w(/why is the (risk )?score/) || w(/signals are the same|same signals/) || w(/(dso|dio).*(concern|increase)/) || w(/cash conversion (cycle|ccc)|what does the (ccc|cash conversion)/) || w(/(how much )?cash.*released?/) || w(/change leverage|affect leverage/) || w(/ask (the )?management|management question/) || w(/information.*missing|missing information|what.*missing/);
+  if (!isChip) return null;
+  if (!a) return NEED;
+  const { risk: rk, latest: L, previous: P, latestRecord: c, previousRecord: pr } = a;
+  const rg = growth(c.revenue, pr?.revenue ?? null);
+  const sc = rk.score == null ? "insufficient data" : `${Math.round(rk.score)}/100 (${rk.classification})`;
+  const ranked = [...rk.categories].filter((x) => x.points != null).sort((x, y) => (y.points! / y.max) - (x.points! / x.max) || y.max - x.max);
+
+  if (w(/worth it|should we invest|good investment/)) {
+    const verify = [...a.alerts].sort((x, y) => (rk.categories.find((k) => k.id === SIGNAL_INDICATOR[y.id])?.max ?? 0) - (rk.categories.find((k) => k.id === SIGNAL_INDICATOR[x.id])?.max ?? 0)).flatMap((x) => x.investigate).filter((v, i, arr) => arr.indexOf(v) === i).slice(0, 3);
+    return `I can't tell you whether ${name} is worth it. This tool screens cash-conversion risk and is **not a verdict**; price, strategy, growth and management are outside it.\n\n**Score:** ${sc}.\n**Top three drivers:**\n` + ranked.slice(0, 3).map((x) => `• **${x.name}** ${x.points}/${x.max} (${x.severity})`).join("\n") + `\n\n**Verify first:**\n` + (verify.length ? verify.map((v) => `• ${v}`).join("\n") : "• No signals fired: confirm the data with a quality-of-earnings review.");
+  }
+  if (w(/why is the (risk )?score/)) {
+    return `**${name}: ${sc}.** Points earned against each indicator's maximum:\n` + rk.categories.map((x) => `• **${x.name}:** ${x.points == null ? "not evaluated (data missing)" : `${x.points}/${x.max}`}`).join("\n") + `\n\nTotal ${rk.rawPoints}/${rk.maxEvaluated} evaluated points${rk.maxEvaluated < 100 ? `, rescaled to 100 (${rk.evaluated} of ${rk.total} indicators evaluated)` : ""}. Bands: 0–24 Low, 25–49 Moderate, 50–74 High, 75–100 Critical.`;
+  }
+  if (w(/signals are the same|same signals/)) {
+    const on = new Set(a.alerts.map((x) => x.id));
+    const line = (g: string) => SIGNALS.filter((x) => x.group === g).map((x) => `${on.has(x.id) ? "🔴" : "⚪"} ${x.name}`).join("\n");
+    return `Several of the seven signals are the same problem seen through different measures, so they shouldn't be counted as independent evidence. 🔴 = triggered for ${name}, ⚪ = not triggered.\n\n**Receivables**\n${line("Receivables")}\n\n**Inventory**\n${line("Inventory")}\n\n**Profit-to-cash**\n${line("Profit-to-cash")}\n\n${a.alerts.length} of 7 triggered.`;
+  }
+  if (w(/dso/)) {
+    const rec = growth(c.receivables, pr?.receivables ?? null), d = L.dso != null && P?.dso != null ? L.dso - P.dso : null;
+    const verdict = d == null ? "Can't judge: DSO is missing for one of the years." : rec != null && rg != null && rec > rg ? "**Yes, worth a look**: receivables are growing faster than revenue, so collections are slowing." : "Less concerning: receivables are not outpacing revenue.";
+    return `DSO went ${fmtDays(P?.dso ?? null)} → ${fmtDays(L.dso)}${d != null ? ` (${d >= 0 ? "+" : ""}${d.toFixed(1)} days)` : ""}.\nRevenue ${pct(rg)} vs receivables ${pct(rec)}.\n${verdict}\n\n**Ageing data to request:** receivables ageing by customer (30/60/90+ days), top-10 customer balances, credit-term changes, cash received after year-end, disputed or credit-noted invoices.`;
+  }
+  if (w(/dio/)) {
+    const inv = growth(c.inventory, pr?.inventory ?? null), d = L.dio != null && P?.dio != null ? L.dio - P.dio : null;
+    const verdict = d == null ? "Can't judge: DIO is missing for one of the years (some businesses carry no inventory)." : inv != null && rg != null && inv > rg ? "**Yes, worth a look**: stock is growing faster than revenue, so it is turning more slowly." : "Less concerning: inventory is not outpacing revenue.";
+    return `DIO went ${fmtDays(P?.dio ?? null)} → ${fmtDays(L.dio)}${d != null ? ` (${d >= 0 ? "+" : ""}${d.toFixed(1)} days)` : ""}.\nRevenue ${pct(rg)} vs inventory ${pct(inv)}.\n${verdict}\n\n**Ageing data to request:** inventory ageing by product line, provisions and write-down history, sell-through rates, open purchase commitments.`;
+  }
+  if (w(/cash conversion|ccc/)) {
+    const d = (x: number | null, y: number | null | undefined) => (x != null && y != null ? ` (${x - y >= 0 ? "+" : ""}${(x - y).toFixed(1)} d)` : "");
+    return `**CCC = DSO + DIO − DPO** — the days cash is tied up between paying suppliers and collecting from customers.\n\nFY${L.year}: ${fmtDays(L.dso)} + ${fmtDays(L.dio)} − ${fmtDays(L.dpo)} = **${fmtDays(L.ccc)}**${L.ccc == null ? ". DPO or another input is missing, so CCC can't be computed" : ""}.\nChange vs FY${P?.year ?? "—"} (${fmtDays(P?.ccc ?? null)}): ${L.ccc != null && P?.ccc != null ? `${L.ccc - P.ccc >= 0 ? "+" : ""}${(L.ccc - P.ccc).toFixed(1)} days` : "n/a"}.\nComponents: DSO${d(L.dso, P?.dso)}, DIO${d(L.dio, P?.dio)}, DPO${d(L.dpo, P?.dpo)}.`;
+  }
+  if (w(/cash.*released?/)) {
+    const base = c.creditSales ?? c.revenue;
+    if (L.dso == null || base == null) return "I can't size the release because DSO or sales is missing for the latest year.";
+    return `Cutting DSO from ${fmtDays(L.dso)} releases cash = (sales ÷ 365) × days saved, on ${c.creditSales != null ? "credit sales" : "revenue"} of ${fmtM(base)}:\n` + SCEN.map((x) => `• **${x.name}** (−${x.cut} days → ${fmtDays(Math.max(0, L.dso! - x.cut))}): **${fmtM(cashRelease(base, L.dso!, Math.max(0, L.dso! - x.cut)))}**`).join("\n") + `\n\n**Caveat:** this is a one-off release, not recurring cash flow, and it assumes revenue stays constant. It is illustrative, not guaranteed: it depends on customer terms and credit quality.`;
+  }
+  if (w(/leverage/)) {
+    const base = c.creditSales ?? c.revenue;
+    if (L.dso == null || base == null || L.netDebt == null || c.ebitda == null || c.ebitda <= 0) return "I can't compute the leverage effect: it needs DSO, sales, net debt and positive EBITDA for the latest year.";
+    return `Now: net debt ${fmtM(L.netDebt)}, EBITDA ${fmtM(c.ebitda)} → **${fmtX(L.netDebtToEbitda)}**.\n\nNew net debt / EBITDA if the release repays debt:\n` + SCEN.map((x) => { const r = cashRelease(base, L.dso!, Math.max(0, L.dso! - x.cut)); return `• **${x.name}:** (${fmtM(L.netDebt)} − ${fmtM(r)}) ÷ ${fmtM(c.ebitda)} = **${fmtX((L.netDebt! - r) / c.ebitda!)}**`; }).join("\n") + `\n\n**Assumption:** the whole one-off release is used to repay debt, with EBITDA and everything else unchanged.`;
+  }
+  if (w(/management/)) {
+    const wt = (id: string) => rk.categories.find((k) => k.id === SIGNAL_INDICATOR[id])?.max ?? 0;
+    const items = [...a.alerts].sort((x, y) => wt(y.id) - wt(x.id)).flatMap((x) => x.investigate.map((i) => ({ i, id: x.id }))).filter((v, k, arr) => arr.findIndex((o) => o.i === v.i) === k).slice(0, 3);
+    if (!items.length) return "No signals fired, so there are no targeted questions. Ask for a standard working-capital and quality-of-earnings walk-through.";
+    return "First three questions, ranked by the weight of the indicator behind them:\n" + items.map((x, n) => `${n + 1}. **Please provide / explain: ${x.i}** (${rk.categories.find((k) => k.id === SIGNAL_INDICATOR[x.id])?.name}, ${wt(x.id)} pts)`).join("\n") + "\n\nThe full list is in section 9 of the **Due Diligence Report**.";
+  }
+  // missing information
+  return `**Data gaps:** ${a.missingFields.length ? a.missingFields.slice(0, 12).join(", ") + (a.missingFields.length > 12 ? ` and ${a.missingFields.length - 12} more` : "") : "none in the supplied fields"}. Dependent indicators are marked unavailable, never zero${rk.evaluated < rk.total ? ` (${rk.total - rk.evaluated} of ${rk.total} indicators couldn't be scored)` : ""}.\n\n**Limits of annual, year-end figures:**\n• ${a.records.length} annual periods; no quarterly or seasonal data.\n• Year-end balances can hide intra-year swings.\n• ${a.metrics.some((x) => x.approximate) ? "The earliest year uses closing balances only (approximate)." : "Average balances were used throughout."}\n• ${c.creditSales == null ? "Credit sales/purchases weren't supplied, so revenue and COGS are proxies." : "Credit sales/purchases were supplied and used."}`;
+}
 
 /**
  * Rule-based answers grounded in the active analysis. No network, no key:
@@ -13,6 +93,8 @@ const sev = { Critical: "🔴", High: "🟠", Medium: "🟡", Low: "🟢" } as c
  */
 export function localAnswer(question: string, name: string, a: AnalysisResult | null): string {
   const q = question.toLowerCase();
+  const chipped = chipAnswer(q, name, a);
+  if (chipped) return chipped;
 
   if (has(q, "upload", "file", "import", "csv", "xlsx", "excel", "format"))
     return "Go to **Company Analysis** and drop a file in the upload box. Accepted: a flat table (Year, Revenue, COGS, EBITDA, Receivables, Inventory, Payables, Operating_Cash_Flow, Cash, Debt), a workbook with *Income Statement* + *Balance Sheet* sheets, or an **S&P Capital IQ Financial Highlights** export. Max 5 MB, at least two years. Then press **Run analysis**.";
