@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import type { AnalysisResult, Dataset, HistoryItem } from "@/types/finance";
 import { GULFTECH } from "@/lib/demo-data/gulftech";
 import { analyze } from "@/lib/calculations/analyze";
@@ -72,7 +72,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [notices, setNotices] = useState<Notice[]>([]);
   const [popups, setPopups] = useState<string[]>([]);
   const [desktop, setDesktop] = useState<Ctx["desktop"]>("unsupported");
-  const hydrated = useRef(false);
+  // state, not a ref: the save effect must wait for the restored data to be applied, or it overwrites storage with the empty defaults
+  const [hydrated, setHydrated] = useState(false);
 
   // Restore uploads + history from this browser after mount (avoids server/client mismatch).
   useEffect(() => {
@@ -90,11 +91,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setStatus(res[id] ? "done" : "idle");
     }
     if (typeof Notification !== "undefined") setDesktop(Notification.permission);
-    hydrated.current = true;
+    setHydrated(true);
   }, []);
 
   useEffect(() => {
-    if (!hydrated.current) return;
+    if (!hydrated) return;
     write({
       uploads: datasets.filter((d) => d.id !== GULFTECH.id),
       activeId,
@@ -102,7 +103,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       history,
       notices: notices.slice(0, 40),
     });
-  }, [datasets, activeId, results, history, notices]);
+  }, [hydrated, datasets, activeId, results, history, notices]);
 
   const active = datasets.find((d) => d.id === activeId) ?? datasets[0];
 
