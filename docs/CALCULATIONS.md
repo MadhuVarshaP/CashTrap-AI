@@ -7,7 +7,10 @@ thresholds and edge-case rules** so each can be re-checked by hand or in Excel.
 |---|---|
 | Unit scaling, orchestration | `lib/calculations/analyze.ts` |
 | Working-capital & cash metrics | `lib/calculations/metrics.ts` |
-| Risk score (six categories) | `lib/calculations/risk.ts` |
+| Risk score (five pillars, 18 indicators) | `lib/calculations/pe-risk.ts` |
+| Stress scenarios | `lib/calculations/stress.ts` |
+| Valuation & illustrative returns | `lib/calculations/valuation.ts` |
+| Investment findings | `lib/calculations/findings.ts` |
 | Alerts (seven signals) | `lib/calculations/alerts.ts` |
 | Report text | `lib/calculations/narrative.ts` |
 | File import / mapping | `lib/utilities/parse.ts` |
@@ -40,6 +43,9 @@ Columns are matched case-insensitively ignoring punctuation. Accepted names incl
 Blank or non-numeric cells → `null` (with a warning). Negative revenue/COGS/balances → warning. Duplicate or invalid years → error.
 At least **2 years** required.
 
+Optional columns (used by the Investment Risk Analysis pillars; each indicator says what it needs): `Capex / Capital Expenditure`,
+`Interest Expense / Finance Costs`, `Current Assets`, `Current Liabilities`, `Scheduled Principal Repayment`, `Short-term Debt / Debt due in 12 months`.
+
 ### 1b. Statement workbook (sheets “Income Statement”, “Balance Sheet”, “Cash Flow Statement”)
 Year columns are found from the header row (`FY2024`, `31-Dec-2024`). Rows are found by **label** (first match):
 
@@ -56,9 +62,21 @@ Year columns are found from the header row (`FY2024`, `31-Dec-2024`). Rows are f
 | Cash | Balance Sheet | `Cash and bank balances` |
 | Debt | Balance Sheet | **sum of** `Short-term bank borrowings` + `Current portion of term loans` + `Term loans, non-current` |
 | Operating cash flow | Cash Flow Statement | `Net cash from operating activities` |
+| Capex | Cash Flow Statement | `Purchase of property, plant…` (absolute value) |
+| Interest | Income Statement | `Finance costs` (absolute value) |
+| Current assets / liabilities | Balance Sheet | `Total current assets` / `Total current liabilities` |
+| Scheduled principal | Balance Sheet | `Current portion of term loans` |
+| Debt due in 12 months | Balance Sheet | `Short-term bank borrowings` + `Current portion of term loans` |
 | Opening balances | Balance Sheet | the column for the year **before** the first record (receivables, inventory, payables) |
 
 ---
+
+### 1c. Provider export (S&P Capital IQ “Financial Highlights”)
+One sheet, line items down column A, fiscal years across (`2024 FY`); currency and magnitude are read from the header lines.
+Revenue ← `Total Revenue`; COGS = Revenue − `Gross Profit`; EBITDA; OCF ← `Cash from Ops.`; Cash ← `Cash & Short-term Investments`; Debt ← `Total Debt`;
+Capex ← `Capital Expenditure` (absolute); current/quick ratios ← reported. DSO/DIO are the **provider's reported averages** (take precedence over balances);
+an implied balance (days × base ÷ 365) is stored for display. Interest = EBITDA ÷ `EBITDA / Interest Expense` when numeric (“NM/NA” → not available).
+No payables line, so DPO, CCC and the working-capital indicator are *not assessed*.
 
 ## 2. Per-year metrics (`computeMetrics`)
 
@@ -82,70 +100,100 @@ If no prior balance exists, the closing balance is used and the year is flagged 
 
 ---
 
-## 3. Risk score (`scoreRisk`)
+## 3. Investment Risk Score (`assessRisk` in `pe-risk.ts`)
 
-Six categories are scored by comparing the **latest year vs the previous year**. Higher points = more risk.
+Five pillars, 18 indicators, 100 points. **Higher = more identified financial risk.** It is a screening score, not a probability
+of failure and not a recommendation.
 
-### 3a. Weights — they are **not** equal
+### 3a. Pillars and indicator allocation
 
-Weights sum to **100**, so *points = percent of the total score*.
+| Pillar (weight) | Indicator | Max |
+|---|---|---:|
+| **Quality of Earnings (25)** | EBITDA adjustments and unusual earnings | 10 |
+| | Revenue quality and cash evidence | 5 |
+| | EBITDA margin deterioration | 5 |
+| | Three-year earnings volatility | 5 |
+| **Cash Flow Sustainability (25)** | EBITDA-to-operating-cash conversion | 10 |
+| | Free cash flow conversion | 10 |
+| | Historical cash-flow consistency | 5 |
+| **Working Capital Risk (20)** | Receivables collection (DSO) | 7 |
+| | Inventory efficiency (DIO) | 5 |
+| | Payables sustainability (DPO) | 3 |
+| | Overall working-capital deterioration | 5 |
+| **Debt and Repayment Risk (20)** | Net debt / EBITDA | 7 |
+| | Interest coverage | 5 |
+| | Debt service coverage ratio | 5 |
+| | Debt maturity concentration | 3 |
+| **Liquidity and Stress Risk (10)** | Cash and short-term liquidity adequacy | 4 |
+| | Revenue and EBITDA downside scenario | 3 |
+| | Cash-flow resilience under stress | 3 |
 
-| # | Category | Weight (pts = %) | Why it carries this weight (design rationale) |
-|---|---|---|---|
-| 1 | Profit-to-cash conversion | **25** | The most direct test of earnings quality: does EBITDA actually become cash? |
-| 2 | Receivables (DSO change) | **20** | Largest and most common cash trap; also carries credit-loss risk. |
-| 3 | EBITDA vs OCF divergence | **20** | Classic earnings-quality red flag; looks at direction of *both* lines. |
-| 4 | Inventory (DIO change) | **15** | Important, but build-ups are more often explainable (orders, hedging). |
-| 5 | Cash conversion cycle | **10** | Largely a *composite* of DSO, DIO and DPO, so it is down-weighted to avoid triple-counting the same effect. |
-| 6 | Leverage (Net debt/EBITDA) | **10** | An amplifier of cash weakness, not a working-capital measure itself. |
+### 3b. From level to points
+Every indicator is judged **Low / Moderate / High / Critical** against its threshold, then awarded a share of its maximum:
+**Low 0% · Moderate 40% · High 70% · Critical 100%** (e.g. a 10-point indicator rated High = 7 points).
 
-The split is a judgement-based prototype design, **not statistically calibrated**. To change it, edit the `max` values and the
-`pts` tuples in `lib/calculations/risk.ts` (keep them summing to 100).
+### 3c. Thresholds (indicative screening bands, not industry standards)
 
-### 3b. Scoring rules
+| Indicator | Measure | Low | Moderate | High | Critical |
+|---|---|---|---|---|---|
+| EBITDA adjustments | Support status of the entered adjustment | verified | needs documents | unsupported | unexplained |
+| | (a verified adjustment above 20% of EBITDA is raised to Moderate) | | | | |
+| Revenue quality | receivables growth − revenue growth | ≤ 0 pp | ≤ 10 | ≤ 30 | > 30 |
+| EBITDA margin | change in margin | ≥ −0.5 pp | ≥ −2 | ≥ −5 | < −5 |
+| Earnings volatility | worst YoY EBITDA fall, last 3 periods (needs 3 years) | none | ≤ 10% | ≤ 25% | > 25% |
+| OCF conversion | OCF ÷ adjusted EBITDA | ≥ 80% | ≥ 50% | ≥ 20% | < 20% or negative (EBITDA ≤ 0 → Critical) |
+| FCF conversion | (OCF − capex) ÷ adjusted EBITDA | ≥ 50% | ≥ 25% | ≥ 0% | negative. Raised to at least High if FCF < interest + scheduled principal |
+| Cash-flow consistency | issues in 3 years: negative OCF years, FCF falling 2 years running, EBITDA up while OCF not up (per year), OCF swing > 40% | 0 | 1 | 2–3 | 4+ |
+| Receivables | change in DSO | ≤ +2 d | ≤ +7 | ≤ +15 | > +15 |
+| Inventory | change in DIO | ≤ +2 d | ≤ +7 | ≤ +15 | > +15 |
+| Payables | absolute change in DPO | ≤ 5 d | ≤ 12 | ≤ 20 | > 20 |
+| Working-capital deterioration | change in OWC ÷ revenue (OWC = receivables + inventory − payables) | ≤ +1 pp | ≤ +3 | ≤ +6 | > +6 |
+| Net debt / EBITDA | net debt ÷ adjusted EBITDA | < 2x (net cash = Low) | ≤ 3x | ≤ 4x | > 4x (EBITDA ≤ 0 with net debt → Critical) |
+| Interest coverage | adjusted EBITDA ÷ cash interest | ≥ 5x | ≥ 3x | ≥ 1.5x | < 1.5x |
+| DSCR | (OCF + interest) ÷ (interest + scheduled principal) | ≥ 1.5x | ≥ 1.2x | ≥ 1.0x | < 1.0x |
+| Debt maturity | debt due within 12 months ÷ total debt | < 30% | < 50% | < 70% | ≥ 70% |
+| Liquidity adequacy | current ratio (quick ratio) — worse of the two applies | ≥ 1.5 (≥ 1.0) | ≥ 1.1 (≥ 0.7) | ≥ 0.8 (≥ 0.5) | below |
+| Downside scenario | net debt ÷ stressed EBITDA (revenue −10%, margin −3 pp) | net cash or < 2x | ≤ 3x | ≤ 4x | > 4x or EBITDA ≤ 0 |
+| Cash-flow resilience | shortfall = capex + scheduled principal − stressed OCF (all four stresses) | none | cash ≥ 1.5× shortfall | cash ≥ shortfall | cash < shortfall |
 
-`Δ` = latest − previous. For day-based rows, an increase below **1 day** counts as stable (0 points).
+Notes:
+- **Adjusted EBITDA** = reported EBITDA + the adjustment **only when it is marked verified** (latest year). Otherwise it equals reported.
+- **No double counting:** DSO, DIO and DPO are scored on their own changes; the *overall* working-capital indicator is scored on cash
+  absorbed relative to revenue; **CCC is shown as a cross-check and is not scored.**
+- **CFADS** for DSCR = OCF + interest paid (OCF is struck after interest).
+- Scheduled principal = current portion of term loans (workbook) or the supplied column. Without it DSCR is *not assessed*.
+- Industry benchmarks are **not used** unless a comparable dataset is supplied (none is built in); history is the comparison.
 
-| Category | Rule → points |
-|---|---|
-| **Receivables** — Δ DSO | ≤ 0 or < 1 day → **0**; 1–10 days → **5**; > 10 – 20 → **10**; > 20 → **20** |
-| **Inventory** — Δ DIO | ≤ 0 or < 1 day → **0**; 1–10 → **5**; > 10 – 20 → **10**; > 20 → **15** |
-| **Profit-to-cash** — cash conversion (latest) | ≥ 80% → **0**; 50% to < 80% → **10**; 20% to < 50% → **20**; < 20% (incl. negative) → **25** |
-| **Divergence** — EBITDA growth *e*, OCF growth *o* | *e* > +10% **and** *o* < −10% → **20**; else if *e* < 0 **or** *o* < 0 → **10**; else (neither deteriorates) → **0** |
-| **CCC** — Δ CCC | ≤ 0 or < 1 day → **0**; 1–10 → **3**; > 10 – 20 → **6**; > 20 → **10** |
-| **Leverage** — Net debt/EBITDA | < 2x → **0**; 2x – 3x → **3**; > 3x – 4x → **7**; > 4x → **10** |
-
-Special cases:
-- Profit-to-cash is **not evaluated** if EBITDA ≤ 0.
-- Leverage with **EBITDA ≤ 0 and net debt > 0** scores the **maximum 10** (ratio not meaningful) and says so in the evidence text.
-- A category with missing inputs is **not evaluated** (`points = null`).
-- “Increase of 1–10 days” and “11–20 days” leave a hairline gap (10.0–11.0); the code treats anything **above 10 and up to 20** as the 11–20 band.
-
-### 3c. Overall score and classification
-
+### 3d. Stress model (`stress.ts`)
 ```
-evaluated   = categories with points ≠ null
-rawPoints   = Σ points of evaluated categories
-maxEvaluated= Σ max of evaluated categories
-score       = round( rawPoints ÷ maxEvaluated × 100 )       // normalised
+stressed revenue = revenue × (1 − revenue drop)
+stressed EBITDA  = stressed revenue × (EBITDA margin − margin drop)
+working-capital drag = stressed credit sales ÷ 365 × collection delay (days)
+extra interest   = total debt × interest rise
+stressed OCF     = OCF + (stressed EBITDA − EBITDA) − working-capital drag − extra interest
 ```
-- Fewer than **4** evaluated categories → **“Insufficient Data”**, no score.
-- With full coverage `maxEvaluated = 100`, so score = rawPoints.
-- With missing categories the remaining weights are **rescaled** (the “effective weight” shown beside each category =
-  `max ÷ maxEvaluated × 100`).
+Defaults: revenue −10%, margin −3 pp, collections +15 days, interest +2 pp. The score is **always judged on the defaults**; the user's
+own assumptions on the Liquidity & stress tab change only the displayed outputs. Illustrative, not a forecast; tax and management actions ignored.
 
-| Score | Classification |
-|---|---|
-| 0–24 | Low Risk |
-| 25–49 | Moderate Risk |
-| 50–74 | High Risk |
-| 75–100 | Critical Risk |
+### 3e. Missing data, coverage and overall score
+- An indicator that can't be computed is **not assessed** (`points = null`), never zero. Each says what it needs.
+- `score = round(points earned ÷ points assessable × 100)`; `coverage = points assessable` (out of 100).
+- If `coverage < 40` the score reads **Insufficient data**.
+- Pillar display: points earned / assessable points in that pillar.
+- Classification: 0–24 Low · 25–49 Moderate · 50–74 High · 75–100 Critical.
+- Prior-year score: same engine on the records without the latest year (adjustment input ignored).
 
-### 3d. Category severity label
-`ratio = points ÷ max`: 0 → Low (“No flag”); < 0.5 → Medium; < 0.8 → High; ≥ 0.8 → Critical.
-
-### 3e. Change vs prior year
-With **3+ years**, the same model is run on the previous year (vs the year before it); the page shows `score − previousScore`.
+### 3f. Valuation view (`valuation.ts`) — separate from the risk score
+```
+Entry multiple  = enterprise value ÷ adjusted EBITDA
+Equity value    = enterprise value − net debt
+Acquisition debt = entered, else enterprise value − equity   (labelled when derived)
+Acquisition leverage = acquisition debt ÷ adjusted EBITDA
+WC adjustment   = max(0, (OWC% − prior OWC%) × revenue)
+```
+Illustrative returns: exit EBITDA = adjusted EBITDA × (1 + g)^years (g entered, else historical CAGR capped 0–10%); exit EV = exit EBITDA × exit multiple
+(entered, else entry multiple); debt repaid = Σ adjusted EBITDA_t × latest FCF conversion; MOIC = (exit EV − remaining debt) ÷ equity; IRR = MOIC^(1/years) − 1.
+No attractiveness score is derived from the risk score.
 
 ---
 
@@ -219,11 +267,14 @@ Pro-forma CCC          = CCC − Days improved            (all else equal)
 
 ## 8. Due Diligence Report numbers
 
-- **Completeness** = evaluated indicators ÷ 6.
-- Section text only quotes figures from §2–§7.
-- The report’s cash-release line uses a **15-day DSO reduction** on the §7 base (`target = DSO − 15`).
-- Questions to management are collected from the triggered alerts’ “investigate” lists (max 10).
-- Every statement is tagged **Verified evidence** (from the engine) or **Possible explanation** (unverified hypothesis).
+Six sections, each answering an investor question: Executive Investment Summary (financial health) · Financial Performance & Earnings Quality ·
+Cash Flow & Working Capital Analysis (where cash is trapped) · Cash Release & Value Creation · Valuation & Investment Returns · Investment Risks & Due Diligence Priorities.
+
+- Every line is tagged **Fact** (from the engine), **Estimate** (sized from the data, e.g. cash tied up = Δdays × sales or COGS ÷ 365), **Assumption**, **Missing data** or **Hypothesis**.
+- Risks are ordered by points scored; impact is quantified in AED / % wherever the data allows (`findings.ts`).
+- Cash-release lines: DSO cuts of 8 / 15 / 25 days on the §7 base, plus a return to last year's DSO and DIO; one-off, constant revenue.
+- Management questions: the questions attached to the highest-scoring flagged indicators (max 8).
+- The report never recommends buying or rejecting the company.
 
 ---
 
@@ -255,17 +306,28 @@ Net receivables 24,900 → 32,200 · Net inventory 19,000 → 24,500 · Payables
 
 FY2024 values (same method): DSO 69.79 · DIO 70.66 · DPO 45.84 · CCC 94.61 · cash conversion 33.6%. EBITDA growth +23.3%, OCF growth −1.9%.
 
-**Risk score for FY2025**
+**Risk score for FY2025** (adjustments not entered, so the EBITDA-adjustments indicator is *not assessed*; 90 of 100 points assessable)
 
-| Category | Evidence | Points |
+| Indicator | Evidence | Points |
 |---|---|---|
-| Receivables | Δ DSO = 81.77 − 69.79 = +11.98 d (> 10 – 20) | 10 / 20 |
-| Inventory | Δ DIO = 84.28 − 70.66 = +13.62 d (> 10 – 20) | 10 / 15 |
-| Profit-to-cash | 26.7% (20% to < 50%) | 20 / 25 |
-| Divergence | EBITDA +23.3% but OCF only −1.9% (not below −10%); one line deteriorates | 10 / 20 |
-| CCC | Δ CCC = 125.92 − 94.61 = +31.31 d (> 20) | 10 / 10 |
-| Leverage | 1.30x (< 2x) | 0 / 10 |
-| **Total** | 60 ÷ 100 × 100 | **60 → High Risk** (prior year 65) |
+| Revenue quality | receivables +29.3% vs revenue +9.5% = +19.8 pp (≤ 30 → High) | 3.5 / 5 |
+| EBITDA margin | 14.6% → 16.5% (+1.8 pp) | 0 / 5 |
+| Earnings volatility | EBITDA +21.9%, +23.3%, no fall | 0 / 5 |
+| OCF conversion | 6,231 ÷ 23,300 = 26.7% (20–50% → High) | 7 / 10 |
+| FCF conversion | (6,231 − 8,400) ÷ 23,300 = −9.3% (negative → Critical) | 10 / 10 |
+| Cash-flow consistency | EBITDA up but OCF down in both years (1 issue → Moderate) | 2 / 5 |
+| Receivables | Δ DSO +12.0 d (≤ +15 → High) | 4.9 / 7 |
+| Inventory | Δ DIO +13.6 d (High) | 3.5 / 5 |
+| Payables | Δ DPO −5.7 d (≤ 12 → Moderate) | 1.2 / 3 |
+| Working-capital deterioration | OWC 49,100 = 34.7% of revenue vs 27.8%: +6.8 pp (Critical) | 5 / 5 |
+| Net debt / EBITDA | 1.30x | 0 / 7 |
+| Interest coverage | 23,300 ÷ 3,100 = 7.5x | 0 / 5 |
+| DSCR | (6,231 + 3,100) ÷ (3,100 + 3,200) = 1.48x (≥ 1.2 → Moderate) | 2 / 5 |
+| Debt maturity | 19,000 ÷ 34,700 = 54.8% (< 70% → High) | 2.1 / 3 |
+| Liquidity adequacy | current 63,581 ÷ 33,961 = 1.87x; quick 1.15x | 0 / 4 |
+| Downside scenario | stressed EBITDA 17,150; 30,319 ÷ 17,150 = 1.77x | 0 / 3 |
+| Cash-flow resilience | stressed OCF −5,321 vs need 8,400 + 3,200 = 11,600; shortfall 16,921 > cash 4,381 (Critical) | 3 / 3 |
+| **Total** | 44.2 ÷ 90 × 100 | **49 → Moderate Risk** (prior year 47) |
 
 **Cash release (§7)**: 127,440 ÷ 365 × (81.77 − 60) = **7,601** (AED '000) — equals the workbook’s own “collections” benchmark.
 
@@ -297,11 +359,13 @@ Release = credit_sales / 365 * (DSO - target)
 
 ## 11. Known simplifications — worth a second look
 
-1. **Weights/thresholds are design choices**, not calibrated or industry-standard.
+1. **Weights/thresholds are design choices**, not calibrated or industry-standard. No industry benchmarks are used.
 2. **Year-end vs average balances:** alerts 1–2 compare year-end balances; DSO/DIO use averages. Both are shown, so numbers may differ slightly.
 3. **Revenue/COGS stand in for credit sales/purchases** when those are not supplied (flat files), overstating the denominator and **understating DSO/DPO**.
-4. **Only two data points drive the score** (latest vs previous year); a single-year spike can swing it.
+4. **Most indicators compare the latest year with the previous one** (three years for volatility and consistency); a single-year spike can swing them.
 5. **Leverage uses total borrowings** (short-term + current portion + term loans). Leases and other debt-like items are not included unless in the debt input.
 6. **Cash bridge “Other” is a plug**, not an audited figure.
 7. **Cash release** assumes constant revenue and customer mix and is a one-off timing effect.
-8. **The 1–2 day hairlines** between scoring bands (see §3b) are resolved as described.
+8. **Provider exports** carry reported days, not balances; implied balances are derived, and payables are absent.
+9. **Verification status of EBITDA adjustments is the investor's input**; the tool cannot verify documents.
+10. **Stress outputs** are illustrative and ignore tax, management actions and covenant effects.

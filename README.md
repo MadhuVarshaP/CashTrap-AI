@@ -54,9 +54,9 @@ leaving **Output Directory** empty (not `public`). No environment variables are 
 |---|---|
 | `/overview` | Investment Intelligence dashboard: KPIs, trends, risk snapshot, signals, working-capital cycle |
 | `/company-analysis` | Drag-and-drop CSV/Excel upload, validation, editable records table, data-quality panel, **Analyse Financials** |
-| `/investment-assessment` | Risk score /100, six-category breakdown, evidence cards, divergence & cash-bridge charts, coverage |
+| `/investment-assessment` | **Investment Risk Analysis**: five-pillar score /100, heatmap, per-pillar tabs, interactive stress testing, valuation view, indicator register, investment findings |
 | `/cash-impact` | DSO scenario calculator (conservative / base / optimistic) with live AED cash-release |
-| `/due-diligence-report` | 11-section report, verified evidence vs possible explanations, print / Markdown export |
+| `/due-diligence-report` | Six investor-question sections; facts, estimates, assumptions, missing data and hypotheses labelled; print / Markdown export |
 | `/methodology` | Formulas, scoring thresholds, AI rules, limitations |
 
 ## Architecture
@@ -69,7 +69,7 @@ components/
   dashboard/         KpiCard
   shared/            ui primitives, Dropzone, Guard (requires analysis)
 lib/
-  calculations/      metrics.ts · risk.ts · alerts.ts · analyze.ts · narrative.ts   (pure, UI-free)
+  calculations/      metrics.ts · pe-risk.ts · stress.ts · valuation.ts · findings.ts · alerts.ts · analyze.ts · narrative.ts   (pure, UI-free)
   demo-data/         gulftech.ts (synthetic)
   utilities/         format.ts · parse.ts (CSV/XLSX + validation) · useCountUp.ts
   state/             store.tsx (datasets, analysis, toasts)
@@ -87,12 +87,14 @@ Calculation logic is kept separate from UI so it can move to the Python backend 
 - Average opening/closing balances are used when a prior year exists; otherwise closing balances are used and flagged *approximate*.
 - Missing inputs yield `null` (shown as "—"), **never zero**. Zero or negative EBITDA, and zero denominators, are handled safely.
 
-### Risk score (higher = more risk)
+### Investment risk score (higher = more risk)
 
-Receivables 20 · Inventory 15 · Profit-to-cash 25 · EBITDA vs OCF divergence 20 · CCC 10 · Leverage 10.
+Five pillars, 18 indicators, 100 points: **Quality of Earnings 25 · Cash Flow Sustainability 25 · Working Capital 20 · Debt and Repayment 20 · Liquidity and Stress 10.**
+Each indicator is judged Low / Moderate / High / Critical against a stated threshold and earns 0 / 40 / 70 / 100% of its maximum.
 Bands: 0–24 Low · 25–49 Moderate · 50–74 High · 75–100 Critical.
-Missing indicators are excluded and the score is **normalised** over those evaluated; at least **4 of 6** are required, otherwise
-"Insufficient Data" is shown. Coverage is always displayed.
+An indicator whose data is missing is **not assessed**, never zero: the score is points earned ÷ points assessable, coverage is always shown,
+and below 40% coverage the result reads "Insufficient Data". It is a screening score, not a probability of failure or a recommendation.
+Investor inputs (EBITDA adjustments, valuation, stress assumptions) are entered on the page, never guessed.
 
 ### Alerts
 

@@ -6,7 +6,7 @@ import { Card, CardHead, PageTitle, Pill } from "@/components/shared/ui";
 const FLOW = [
   { i: FileInput, t: "Ingest", d: "CSV / Excel statements, validated and unit-normalised." },
   { i: Calculator, t: "Calculate", d: "DSO · DIO · DPO · CCC, cash conversion, leverage." },
-  { i: Gauge, t: "Score", d: "Six weighted indicators → 0–100 screening score." },
+  { i: Gauge, t: "Score", d: "Five pillars, 18 indicators → 0–100 screening score." },
   { i: ShieldAlert, t: "Detect", d: "Seven anomaly rules with evidence." },
   { i: FileText, t: "Explain", d: "Narrative uses engine figures only." },
 ];
@@ -21,12 +21,29 @@ const METRICS = [
 ];
 
 const MODEL: [string, number, string][] = [
-  ["Receivables (DSO change)", 20, "0 · +1–10d → 5 · +11–20d → 10 · >+20d → 20"],
-  ["Inventory (DIO change)", 15, "0 · +1–10d → 5 · +11–20d → 10 · >+20d → 15"],
-  ["Profit-to-cash conversion", 25, "≥80% → 0 · 50–79% → 10 · 20–49% → 20 · <20% → 25"],
-  ["EBITDA vs OCF divergence", 20, "Both improve → 0 · one worsens → 10 · EBITDA >+10% & OCF <−10% → 20"],
-  ["Cash conversion cycle", 10, "Stable → 0 · +1–10d → 3 · +11–20d → 6 · >+20d → 10"],
-  ["Leverage", 10, "<2x → 0 · 2–3x → 3 · >3–4x → 7 · >4x → 10"],
+  ["Quality of Earnings", 25, "Reliability and sustainability of reported EBITDA"],
+  ["· EBITDA adjustments", 10, "Verified → Low · needs documents → Moderate · unsupported → High · unexplained → Critical"],
+  ["· Revenue quality vs cash", 5, "Receivables growth − revenue growth: ≤0 → Low · ≤10pp → Mod · ≤30pp → High · above → Critical"],
+  ["· EBITDA margin", 5, "Change ≥ −0.5pp → Low · ≥ −2 → Mod · ≥ −5 → High · below → Critical"],
+  ["· Earnings volatility", 5, "Worst YoY EBITDA fall in 3 periods: none → Low · ≤10% → Mod · ≤25% → High · above → Critical"],
+  ["Cash Flow Sustainability", 25, "How well earnings become cash"],
+  ["· OCF ÷ adjusted EBITDA", 10, "≥80% → Low · 50–80% → Mod · 20–50% → High · <20% or negative → Critical"],
+  ["· FCF ÷ adjusted EBITDA", 10, "≥50% → Low · 25–50% → Mod · 0–25% → High · negative → Critical"],
+  ["· Cash-flow consistency", 5, "Issues counted over 3 years: 0 → Low · 1 → Mod · 2–3 → High · 4+ → Critical"],
+  ["Working Capital Risk", 20, "Cash trapped in operations (CCC is a cross-check, not scored again)"],
+  ["· Receivables (DSO)", 7, "Change ≤+2d → Low · ≤+7 → Mod · ≤+15 → High · above → Critical"],
+  ["· Inventory (DIO)", 5, "Change ≤+2d → Low · ≤+7 → Mod · ≤+15 → High · above → Critical"],
+  ["· Payables (DPO)", 3, "|Change| ≤5d → Low · ≤12 → Mod · ≤20 → High · above → Critical"],
+  ["· Operating WC / revenue", 5, "Change ≤+1pp → Low · ≤+3 → Mod · ≤+6 → High · above → Critical"],
+  ["Debt and Repayment Risk", 20, "Ability to meet financial obligations"],
+  ["· Net debt / EBITDA", 7, "<2x → Low · 2–3x → Mod · 3–4x → High · >4x → Critical"],
+  ["· Interest coverage", 5, "≥5x → Low · ≥3x → Mod · ≥1.5x → High · below → Critical"],
+  ["· Debt service coverage", 5, "≥1.5x → Low · ≥1.2x → Mod · ≥1.0x → High · below → Critical"],
+  ["· Debt maturity", 3, "Due in 12m: <30% → Low · <50% → Mod · <70% → High · ≥70% → Critical"],
+  ["Liquidity and Stress Risk", 10, "Resilience to adverse events"],
+  ["· Liquidity adequacy", 4, "Current ratio ≥1.5 / quick ≥1.0 → Low; worse of the two applies"],
+  ["· Downside scenario", 3, "Net debt ÷ stressed EBITDA (revenue −10%, margin −3pp)"],
+  ["· Cash-flow resilience", 3, "Shortfall after four stresses, covered by cash? none → Low · 1.5x → Mod · 1x → High · else Critical"],
 ];
 
 const BANDS = [
@@ -87,14 +104,14 @@ export default function Methodology() {
           <CardHead title="Risk classification" />
           <div className="flex h-3 overflow-hidden rounded-full">{BANDS.map(([, , c], i) => <div key={i} className="flex-1" style={{ background: c, opacity: 0.35 + i * 0.22 }} />)}</div>
           <div className="mt-3 grid grid-cols-4 gap-2 text-center">{BANDS.map(([r, l, c]) => <div key={r}><div className="font-mono text-[11px] text-ink2">{r}</div><div className="text-[11px]" style={{ color: c }}>{l.replace(" Risk", "")}</div></div>)}</div>
-          <p className="mt-5 text-[12.5px] leading-relaxed text-ink2">Missing metrics are never scored as zero. The score is normalised across indicators that could be evaluated; at least four of six are required, otherwise <span className="text-ink">&ldquo;Insufficient Data&rdquo;</span> is shown with coverage.</p>
+          <p className="mt-5 text-[12.5px] leading-relaxed text-ink2">Missing data is never scored as zero. Score = points earned ÷ points assessable × 100, over the indicators the data supports. If less than 40% of the 100 points can be assessed the result reads <span className="text-ink">Insufficient data</span>.</p>
         </Card>
 
         <Card className="xl:col-span-12">
-          <CardHead title="Risk-scoring model · 100 points" hint="Prototype screening thresholds, not universal industry standards." />
+          <CardHead title="Risk-scoring model · 5 pillars · 100 points" hint="Indicative screening thresholds, not universal industry standards. Level share of an indicator's maximum: Low 0% · Moderate 40% · High 70% · Critical 100%." />
           <div className="space-y-2.5">
             {MODEL.map(([n, pts, rule]) => (
-              <div key={n} className="grid items-center gap-2 rounded-xl border border-line bg-bg2 p-3.5 md:grid-cols-[230px_1fr_120px] md:gap-5">
+              <div key={n} className={`grid items-center gap-2 rounded-xl border p-3.5 md:grid-cols-[230px_1fr_120px] md:gap-5 ${n.startsWith("·") ? "ml-0 border-line bg-bg2 md:ml-6" : "border-[#3f4551] bg-elev"}`}>
                 <span className="text-[13.5px] font-medium">{n}</span>
                 <span className="font-mono text-[11.5px] text-ink2">{rule}</span>
                 <div className="flex items-center gap-2 md:justify-end"><div className="h-1.5 flex-1 rounded-full bg-elev md:hidden"><div className="h-full rounded-full bg-accent" style={{ width: `${pts * 4}%` }} /></div><span className="font-mono text-[12px] text-accent">{pts} pts · {pts}%</span></div>
