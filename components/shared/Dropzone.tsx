@@ -5,11 +5,11 @@ import { AnimatePresence, motion } from "framer-motion";
 import { AlertTriangle, CheckCircle2, FileSpreadsheet, Loader2, UploadCloud } from "lucide-react";
 import { useRef, useState } from "react";
 import type { FinancialRecord } from "@/types/finance";
-import { parseFinancialFile } from "@/lib/utilities/parse";
+import { parseFinancialFile, type ParseMeta } from "@/lib/utilities/parse";
 
-type S = { kind: "idle" } | { kind: "reading"; name: string; pct: number } | { kind: "ok"; name: string; warnings: string[] } | { kind: "error"; errors: string[] };
+type S = { kind: "idle" } | { kind: "reading"; name: string; pct: number } | { kind: "ok"; name: string; warnings: string[]; notes: string[] } | { kind: "error"; errors: string[] };
 
-export function Dropzone({ onParsed }: { onParsed: (r: FinancialRecord[], file: File) => void }) {
+export function Dropzone({ onParsed }: { onParsed: (r: FinancialRecord[], file: File, meta?: ParseMeta) => void }) {
   const [s, setS] = useState<S>({ kind: "idle" });
   const [over, setOver] = useState(false);
   const input = useRef<HTMLInputElement>(null);
@@ -21,8 +21,8 @@ export function Dropzone({ onParsed }: { onParsed: (r: FinancialRecord[], file: 
     const res = await parseFinancialFile(file);
     clearInterval(t);
     if (res.errors.length) return setS({ kind: "error", errors: res.errors.slice(0, 5) });
-    setS({ kind: "ok", name: file.name, warnings: res.warnings.slice(0, 6) });
-    onParsed(res.records, file);
+    setS({ kind: "ok", name: file.name, warnings: res.warnings.slice(0, 6), notes: res.notes ?? [] });
+    onParsed(res.records, file, res.meta);
   }
 
   return (
@@ -57,6 +57,7 @@ export function Dropzone({ onParsed }: { onParsed: (r: FinancialRecord[], file: 
       {s.kind === "ok" && (
         <div className="mt-3 rounded-xl border border-pos/30 bg-pos/5 p-3.5 text-[12.5px]">
           <div className="flex items-center gap-2 text-pos"><CheckCircle2 size={15} /> {s.name} validated</div>
+          {s.notes.map((n) => <div key={n} className="mt-1.5 text-ink2">{n}</div>)}
           {s.warnings.map((w) => <div key={w} className="mt-1.5 flex gap-2 text-warn"><AlertTriangle size={13} className="mt-0.5 shrink-0" />{w}</div>)}
         </div>
       )}

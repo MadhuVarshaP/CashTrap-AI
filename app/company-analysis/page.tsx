@@ -41,7 +41,7 @@ export default function CompanyAnalysis() {
   if (active.records.length < 2) warnings.push("At least two years are needed to assess trends.");
   if (active.records.length < 3) warnings.push("Fewer than three years limits trend reliability.");
   if (active.records.some((r) => r.ebitda != null && r.ebitda <= 0)) warnings.push("Non-positive EBITDA: cash conversion and leverage ratios are not meaningful for those years.");
-  if (!active.synthetic) warnings.push("Year-end balances only: DSO/DIO/DPO for the first year are approximations.");
+  if (active.records[0] && !active.records[0].opening) warnings.push("First-year DSO/DIO/DPO use closing balances only unless opening balances were supplied.");
   const ready = active.records.length >= 2;
 
   return (
@@ -51,8 +51,8 @@ export default function CompanyAnalysis() {
       <div className="grid gap-5 xl:grid-cols-12">
         <Card className="xl:col-span-7">
           <CardHead title="Upload financial records" hint="Columns are matched by name; common aliases (Sales, OCF, Total Debt…) are recognised. Blank cells are treated as missing, never zero." />
-          <Dropzone onParsed={(records, file) => {
-            addDataset({ id: `upload-${Date.now()}`, name: file.name.replace(/\.[^.]+$/, ""), industry: "Uploaded company", synthetic: false, records, unitMultiplier: 1_000_000, fileName: file.name });
+          <Dropzone onParsed={(records, file, meta) => {
+            addDataset({ id: `upload-${Date.now()}`, name: meta?.name ?? file.name.replace(/\.[^.]+$/, ""), industry: "Uploaded company", synthetic: !!meta?.synthetic, records, unitMultiplier: meta?.unitMultiplier ?? 1_000_000, fileName: file.name });
             toast(`Loaded ${records.length} years from ${file.name}`, "pos");
           }} />
           <div className="mt-4 flex flex-wrap items-center gap-3">
@@ -78,7 +78,7 @@ export default function CompanyAnalysis() {
               {warnings.map((w) => <li key={w} className="flex gap-2 text-[12.5px] text-warn"><AlertTriangle size={14} className="mt-0.5 shrink-0" />{w}</li>)}
               {warnings.length === 0 && <li className="flex gap-2 text-[12.5px] text-pos"><CheckCircle2 size={14} className="mt-0.5 shrink-0" />No validation warnings.</li>}
             </ul>
-            {!active.synthetic && (
+            {(!active.synthetic || active.fileName) && (
               <label className="mt-4 flex items-center justify-between gap-3 text-[12.5px] text-ink2">Values are in
                 <select value={active.unitMultiplier} onChange={(e) => updateDataset({ ...active, unitMultiplier: Number(e.target.value) })} className="rounded-lg border border-line bg-elev px-2.5 py-2 text-ink">
                   {UNITS.map((u) => <option key={u.v} value={u.v}>{u.label}</option>)}
