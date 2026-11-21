@@ -106,6 +106,14 @@ Columns: `Year, Revenue, COGS, EBITDA, Receivables, Inventory, Payables, Operati
 (common aliases such as Sales, OCF, Total Debt are recognised; a CSV template can be downloaded from the Company Analysis page).
 Max 5 MB, at least two years. Pick the unit (AED / thousands / millions) after upload.
 
+### Statement workbooks
+
+Besides the flat table, a workbook with **Income Statement**, **Balance Sheet** and **Cash Flow Statement** sheets (line items down,
+years across) is detected automatically. Revenue, COGS, EBITDA, trade receivables/inventories/payables, cash, total borrowings and
+operating cash flow are read by row label; units (`AED '000`) are detected; *Credit sales* / *Credit purchases* rows are used for DSO / DPO and the
+earlier balance-sheet column provides opening balances. A sample is in `data/GulfTech_Manufacturing_Synthetic_Financials.xlsx`
+(its computed DSO/DIO/DPO/CCC match the workbook's own *Expected Metrics* sheet).
+
 ## FastAPI integration (planned)
 
 - `POST /analyze` — body: `Dataset`; returns `AnalysisResult` (metrics, risk, alerts). Set `NEXT_PUBLIC_API_URL` and the client in `lib/api/client.ts` will call it.
