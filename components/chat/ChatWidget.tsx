@@ -91,6 +91,11 @@ export function ChatWidget() {
               {busy && <div className="flex gap-1 pl-1" aria-label="Typing">{[0, 1, 2].map((i) => <motion.span key={i} className="h-1.5 w-1.5 rounded-full bg-ink3" animate={{ opacity: [0.3, 1, 0.3] }} transition={{ duration: 1, repeat: Infinity, delay: i * 0.18 }} />)}</div>}
               <div ref={end} />
             </div>
+            {msgs.length > 0 && (
+              <div className="flex gap-2 overflow-x-auto border-t border-line px-3 py-2.5 [scrollbar-width:thin]" aria-label="Suggested questions">
+                {suggestions(analysis).map((s) => <button key={s} onClick={() => send(s)} disabled={busy} className="shrink-0 whitespace-nowrap rounded-full border border-line bg-card px-3 py-1.5 text-[12px] text-ink2 hover:border-accent hover:text-ink disabled:opacity-50">{s}</button>)}
+              </div>
+            )}
             <form onSubmit={(e) => { e.preventDefault(); send(input); }} className="flex items-center gap-2 border-t border-line p-3">
               <input value={input} onChange={(e) => setInput(e.target.value)} placeholder="Ask about this company…" maxLength={400} className="h-10 min-w-0 flex-1 rounded-xl border border-line bg-bg2 px-3 text-[13px] outline-none placeholder:text-ink3 focus:border-accent" />
               <button type="submit" disabled={!input.trim() || busy} aria-label="Send" className="grid h-10 w-10 place-items-center rounded-xl bg-accent text-white disabled:opacity-40"><Send size={16} /></button>
