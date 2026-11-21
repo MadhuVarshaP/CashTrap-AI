@@ -34,7 +34,7 @@ export default function CompanyAnalysis() {
   const edit = (year: number, key: FieldKey, raw: string) => {
     const v = raw.trim() === "" ? null : Number(raw);
     if (v != null && !Number.isFinite(v)) return;
-    updateDataset({ ...active, records: active.records.map((r) => (r.year === year ? { ...r, [key]: v } : r)) });
+    updateDataset({ ...active, records: active.records.map((r) => (r.year !== year ? r : { ...r, [key]: v, ...(key === "receivables" ? { reportedDso: null } : key === "inventory" ? { reportedDio: null } : key === "payables" ? { reportedDpo: null } : {}) })) });
   };
 
   const warnings: string[] = [];
