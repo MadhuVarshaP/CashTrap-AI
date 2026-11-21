@@ -137,7 +137,7 @@ function Dashboard({ a, go }: { a: AnalysisResult; go: (t: Tab) => void }) {
 
       <Card className="xl:col-span-5">
         <CardHead title="Risk contribution" hint="Points each pillar adds to the overall score (of 100 assessable)." />
-        <div className="h-[230px]"><ContributionChart risk={risk} /></div>
+        <div className="h-[300px]"><ContributionChart risk={risk} /></div><p className="mt-3 font-mono text-[10.5px] text-ink3">POINTS OF {risk.maxEvaluated} ASSESSABLE · TOTAL {risk.rawPoints}</p>
       </Card>
 
       <Card className="xl:col-span-7">
