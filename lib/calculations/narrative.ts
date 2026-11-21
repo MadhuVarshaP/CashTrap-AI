@@ -34,7 +34,8 @@ export function buildReport(a: AnalysisResult, targetDsoDays = 15): ReportSectio
   const rg = growth(c.revenue, p?.revenue ?? null);
   const recG = growth(c.receivables, p?.receivables ?? null), invG = growth(c.inventory, p?.inventory ?? null);
   const eg = growth(c.ebitda, p?.ebitda ?? null), og = growth(c.operatingCashFlow, p?.operatingCashFlow ?? null);
-  const rel = c.revenue != null && m.dso != null ? cashRelease(c.revenue, m.dso, Math.max(0, m.dso - targetDsoDays)) : null;
+  const salesBase = c.creditSales ?? c.revenue; // same base DSO was measured on
+  const rel = salesBase != null && m.dso != null ? cashRelease(salesBase, m.dso, Math.max(0, m.dso - targetDsoDays)) : null;
   const gaps = [...a.missingFields];
   const pctS = (g: number | null) => (g == null ? "n/a" : `${g >= 0 ? "+" : ""}${(g * 100).toFixed(1)}%`);
 

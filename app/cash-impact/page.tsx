@@ -33,7 +33,9 @@ function NumField({ label, value, onChange, unit, error }: { label: string; valu
 
 export default function CashImpact() {
   const { analysis, active } = useApp();
-  const defRev = analysis?.latestRecord.revenue ?? 471;
+  // DSO is measured on credit sales when supplied, so the same base is used for the cash-release maths
+  const creditBasis = analysis?.latestRecord.creditSales != null;
+  const defRev = analysis?.latestRecord.creditSales ?? analysis?.latestRecord.revenue ?? 471;
   const defDso = analysis?.latest.dso ?? 75.9;
 
   const [rev, setRev] = useState("");
@@ -73,7 +75,7 @@ export default function CashImpact() {
         <Card className="xl:col-span-4">
           <CardHead title="Inputs" hint="Prefilled from the active company's latest year. Edit any value to model your own case." />
           <div className="space-y-4">
-            <NumField label="Annual revenue" value={rev} onChange={setRev} unit="AED m" error={revErr} />
+            <NumField label={creditBasis ? "Annual credit sales" : "Annual revenue"} value={rev} onChange={setRev} unit="AED m" error={revErr} />
             <NumField label="Current DSO" value={dso} onChange={setDso} unit="days" error={dsoErr} />
             <NumField label={`Target DSO · ${SCEN[sel].name}`} value={String(targets[sel] ?? "")} onChange={(v) => { const n = num(v); if (!isNaN(n)) set(sel, Math.max(0, n)); }} unit="days" error={valid && T > D ? "Target is above current DSO" : undefined} />
             <input type="range" min={0} max={maxT} step={1} value={Math.min(T, maxT)} onChange={(e) => set(sel, Number(e.target.value))} className="w-full" aria-label="Target DSO slider" />
