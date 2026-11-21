@@ -4,6 +4,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { X } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import { useApp } from "@/lib/state/store";
+import { ChatWidget } from "@/components/chat/ChatWidget";
 import { Header } from "./Header";
 import { MobileNav, Sidebar } from "./Sidebar";
 
@@ -23,6 +24,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
         </motion.main>
       </div>
       <MobileNav />
+      <ChatWidget />
       <div className="pointer-events-none fixed inset-x-4 top-[76px] z-[70] flex flex-col items-end gap-2 sm:inset-x-auto sm:right-6 sm:top-[84px] print:hidden" aria-live="polite" role="status">
         <AnimatePresence>
           {popups.map((id) => notices.find((n) => n.id === id)).filter((n) => !!n).map((n) => (
