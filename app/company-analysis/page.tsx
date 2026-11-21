@@ -7,6 +7,7 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import { Dropzone } from "@/components/shared/Dropzone";
 import { Bar, Button, Card, CardHead, PageTitle, Pill } from "@/components/shared/ui";
+import { analyze } from "@/lib/calculations/analyze";
 import { GULFTECH } from "@/lib/demo-data/gulftech";
 import { useApp } from "@/lib/state/store";
 import { REQUIRED_COLUMNS, SAMPLE_CSV, dataQuality } from "@/lib/utilities/parse";
@@ -37,6 +38,11 @@ export default function CompanyAnalysis() {
     updateDataset({ ...active, records: active.records.map((r) => (r.year !== year ? r : { ...r, [key]: v, ...(key === "receivables" ? { reportedDso: null } : key === "inventory" ? { reportedDio: null } : key === "payables" ? { reportedDpo: null } : {}) })) });
   };
 
+  // which fields are empty, in which years, and what that switches off: computed with the same engine the Run button uses
+  const preview = useMemo(() => analyze(active), [active]);
+  const label = (k: string) => COLS.find((c) => c.key === k)?.label ?? k;
+  const gaps = Object.entries(dq.missing.reduce<Record<string, number[]>>((m, x) => ((m[x.field] ??= []).push(x.year), m), {}));
+  const off = preview?.risk.categories.filter((c) => c.points == null) ?? [];
   const warnings: string[] = [];
   if (dq.missing.length) warnings.push(`${dq.missing.length} missing value${dq.missing.length > 1 ? "s" : ""}: dependent indicators will be marked unavailable, not zero.`);
   if (active.records.length < 2) warnings.push("At least two years are needed to assess trends.");
@@ -79,6 +85,22 @@ export default function CompanyAnalysis() {
               {warnings.map((w) => <li key={w} className="flex gap-2 text-[12.5px] text-warn"><AlertTriangle size={14} className="mt-0.5 shrink-0" />{w}</li>)}
               {warnings.length === 0 && <li className="flex gap-2 text-[12.5px] text-pos"><CheckCircle2 size={14} className="mt-0.5 shrink-0" />No validation warnings.</li>}
             </ul>
+            {gaps.length > 0 && (
+              <div className="mt-4 rounded-xl border border-warn/25 bg-warn/5 p-3.5 text-[12.5px]">
+                <div className="mb-2 font-mono text-[10px] uppercase tracking-wider text-warn">What is missing</div>
+                <ul className="space-y-1.5">
+                  {gaps.map(([f, ys]) => (
+                    <li key={f} className="flex flex-wrap items-baseline gap-x-2 text-ink2"><span className="font-medium text-ink">{label(f)}</span><span className="font-mono text-[11px] text-ink3">{ys.length === active.records.length ? "all years" : ys.map((y) => `FY${y}`).join(", ")}</span></li>
+                  ))}
+                </ul>
+                <p className="mt-3 text-ink2">
+                  {!preview ? "At least two years are needed before analysis can run."
+                    : preview.risk.insufficient ? <span className="text-crit">Analysis will run but the score will read “Insufficient data”: only {preview.risk.evaluated} of {preview.risk.total} indicators can be computed and at least 4 are needed.</span>
+                    : <>You can still run the analysis. <span className="text-ink">{preview.risk.evaluated} of {preview.risk.total}</span> indicators can be computed{off.length ? `; not available: ${off.map((c) => c.name).join(", ")}` : ""}. The score is rescaled over the indicators that are available.</>}
+                </p>
+                <p className="mt-2 text-ink3">Fill a value in the table below (click “missing”) to switch an indicator back on.</p>
+              </div>
+            )}
             {(!active.synthetic || active.fileName) && (
               <label className="mt-4 flex items-center justify-between gap-3 text-[12.5px] text-ink2">Values are in
                 <select value={active.unitMultiplier} onChange={(e) => updateDataset({ ...active, unitMultiplier: Number(e.target.value) })} className="rounded-lg border border-line bg-elev px-2.5 py-2 text-ink">
