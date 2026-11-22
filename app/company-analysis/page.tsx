@@ -63,9 +63,9 @@ export default function CompanyAnalysis() {
   return (
     <>
 
-      <IndustryProfile draft={hasCompany ? undefined : { value: draft, set: setDraft }} />
       <div className="grid gap-5 xl:grid-cols-12">
-        <Card className={hasCompany ? "xl:col-span-7" : "xl:col-span-12"}>
+        <div className={hasCompany ? "xl:col-span-7" : "xl:col-span-12"}>
+        <Card className="mb-5">
           <CardHead title="Upload financial records" hint="Columns are matched by name; common aliases (Sales, OCF, Total Debt…) are recognised. Blank cells are treated as missing, never zero." />
           <Dropzone onError={(errs, file) => notify({ title: `Couldn't read ${file.name}`, body: errs[0], tone: "crit" })} onParsed={(records, file, meta, warns) => {
             addDataset({ id: `upload-${Date.now()}`, name: draft.name || (meta?.name ?? file.name.replace(/\.[^.]+$/, "")), industry: "Uploaded company", synthetic: !!meta?.synthetic, records, unitMultiplier: meta?.unitMultiplier ?? 1_000_000, fileName: file.name, fileSize: file.size, fileCurrency: meta?.currency, inputs: { industry: draft.industry, subIndustry: draft.subIndustry, currency: draft.currency ?? meta?.currency ?? "AED", frequency: draft.frequency ?? "Annual" } });
@@ -82,6 +82,8 @@ export default function CompanyAnalysis() {
             <div className="flex flex-wrap gap-1.5">{["EBITDA_Adjustments", "Capex", "Cash_Taxes", "Cash_Interest", "Current_Assets", "Current_Liabilities", "Scheduled_Principal", "Annual_Purchases", "Credit_Sales"].map((c) => <span key={c} className="rounded-md border border-dashed border-line px-2 py-1 font-mono text-[10.5px] text-ink3">{c}</span>)}</div>
           </div>
         </Card>
+        <IndustryProfile draft={hasCompany ? undefined : { value: draft, set: setDraft }} />
+        </div>
 
         {hasCompany && <div className="space-y-5 xl:col-span-5">
           <Card>

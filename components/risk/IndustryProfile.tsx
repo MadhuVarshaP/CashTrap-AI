@@ -30,9 +30,9 @@ export function IndustryProfile({ onChanged, draft }: { onChanged?: () => void; 
     if (draft) return "Read from the uploaded file"; const ys = active.records.map((r) => r.year); return ys.length ? `FY${Math.min(...ys)} to FY${Math.max(...ys)}` : "—"; }, [active.records, draft]);
   const change = (patch: ProfileDraft & Parameters<typeof updateInputs>[0]) => { if (draft) draft.set({ ...draft.value, ...patch }); else { updateInputs(patch); onChanged?.(); } };
   return (
-    <Card hover={false} className="mb-6 !border-accent/30">
+    <Card hover={false} className="!border-accent/30">
       <CardHead icon={<Building2 size={17} className="text-accent" />} title="Target company profile" hint="Choose the target's industry when you upload. It selects the benchmarks, changes the scoring thresholds and decides which indicators apply. You can change it any time." right={def ? <Pill tone="accent">{def.name}</Pill> : <Pill tone="warn">No industry selected</Pill>} />
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-2">
         <Field label="Select Target Company Industry">
           <select aria-label="Select Target Company Industry" value={i.industry ?? ""} className={sel} onChange={(e) => change({ industry: e.target.value || undefined, subIndustry: undefined, thresholds: {} })}>
             <option value="">Select industry…</option>
