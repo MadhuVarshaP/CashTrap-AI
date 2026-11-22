@@ -56,7 +56,7 @@ export function Header() {
           </div>
         </div>
         <div className="flex items-center gap-2 sm:gap-3">
-          {/* {active.synthetic && <Pill tone="warn" className="hidden md:inline-flex">● Demo data · synthetic</Pill>} */}
+          
           <div ref={selRef} className="relative">
             <button onClick={() => setSel(!sel)} className="flex h-10 items-center gap-2 rounded-xl border border-line bg-card px-3 text-[12.5px] hover:border-[#3f4551]" aria-haspopup="listbox" aria-expanded={sel}>
               <Building2 size={15} className="text-ink3" />
@@ -129,7 +129,6 @@ export function Header() {
           {/* <div className="hidden h-10 w-10 place-items-center rounded-xl bg-elev font-display text-[13px] font-semibold text-ink2 sm:grid" aria-label="Profile">MV</div> */}
         </div>
       </header>
-      {active.synthetic && <div className="border-b border-warn/20 bg-warn/5 px-4 py-1.5 text-center font-mono text-[10px] uppercase tracking-wider text-warn md:hidden print:hidden">Demo data · all figures synthetic</div>}
       <AnimatePresence>
         {cmd && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[60] grid place-items-start bg-black/60 p-4 pt-24 backdrop-blur-sm print:hidden" onClick={() => setCmd(false)}>

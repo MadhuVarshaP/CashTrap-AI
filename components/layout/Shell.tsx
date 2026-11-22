@@ -6,7 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useApp } from "@/lib/state/store";
 import { ChatWidget } from "@/components/chat/ChatWidget";
 import { Header } from "./Header";
-import { MobileNav, Sidebar } from "./Sidebar";
+import { MobileNav, Sidebar, SubNav } from "./Sidebar";
 
 export function Shell({ children }: { children: React.ReactNode }) {
   const path = usePathname();
@@ -20,6 +20,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
       <div className="flex min-w-0 flex-1 flex-col">
         <Header />
         <motion.main key={path} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }} className="mx-auto w-full max-w-[1440px] flex-1 px-4 pb-28 pt-6 sm:px-8 sm:pt-8 lg:pb-12 print:max-w-none print:p-0">
+          <SubNav />
           {children}
         </motion.main>
       </div>
