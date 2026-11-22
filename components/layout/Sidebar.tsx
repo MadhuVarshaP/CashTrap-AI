@@ -18,7 +18,7 @@ export function Sidebar() {
   const [openGroup, setOpenGroup] = useState<string | null>(null);
   useAutoCollapse(openGroup !== null, () => setOpenGroup(null), 20000);
   return (
-    <aside className={clsx("sticky top-0 z-30 hidden h-screen shrink-0 flex-col border-r border-line bg-bg2 py-5 transition-[width] duration-300 lg:flex print:hidden", open ? "w-[260px] px-4" : "w-[84px] items-center px-3")}>
+    <aside className={clsx("sticky top-0 z-30 hidden h-screen shrink-0 flex-col border-r border-[#DCE3FA] bg-gradient-to-b from-[#E8EEFF] via-[#EEF1FF] to-[#F3EEFF] py-5 transition-[width] duration-300 lg:flex print:hidden", open ? "w-[260px] px-4" : "w-[84px] items-center px-3")}>
       <Link href="/company-analysis" className={clsx("mb-8 flex items-center gap-3", !open && "justify-center")} aria-label="CashCop AI home">
         <LogoMark size={32} />
         {open && <Wordmark />}
@@ -31,7 +31,7 @@ export function Sidebar() {
             <div key={g.id}>
               <Link href={g.href} title={g.label} onClick={(e) => { if (open && g.items.length) { if (openGroup === g.id) { e.preventDefault(); setOpenGroup(null); } else setOpenGroup(g.id); } }} aria-expanded={open ? expanded : undefined}
                 className={clsx("group relative flex h-11 items-center gap-3 rounded-xl text-[13px] transition-colors", open ? "px-3" : "justify-center", active ? "text-ink" : "text-ink3 hover:bg-card hover:text-ink2")}>
-                {active && <motion.span layoutId="nav-active" className="absolute inset-0 rounded-xl border border-line bg-elev" transition={{ type: "spring", stiffness: 420, damping: 36 }} />}
+                {active && <motion.span layoutId="nav-active" className="absolute inset-0 rounded-xl border border-[#D5DDF7] bg-white shadow-card" transition={{ type: "spring", stiffness: 420, damping: 36 }} />}
                 {active && <motion.span layoutId="nav-bar" className="absolute -left-3 top-2.5 h-6 w-[3px] rounded-r bg-accent" />}
                 <g.icon size={19} className={clsx("relative shrink-0", active && "text-accent")} />
                 {open && <span className="relative flex-1 truncate font-medium">{g.label}</span>}
