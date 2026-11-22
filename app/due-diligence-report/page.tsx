@@ -4,11 +4,12 @@ import { cur } from "@/lib/utilities/format";
 import clsx from "clsx";
 import { AnimatePresence, motion } from "framer-motion";
 import { BadgeCheck, ChevronDown, FileDown, FileText, Loader2, Printer, RefreshCw, Sparkles } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { RiskGauge } from "@/components/charts/RiskGauge";
 import { WithAnalysis } from "@/components/shared/Guard";
-import { Button, Card, PageTitle, Pill } from "@/components/shared/ui";
-import { buildReport, type ReportSection, type Tag } from "@/lib/calculations/narrative";
+import { Button, Card, PageTitle } from "@/components/shared/ui";
+import { buildReport, type Tag } from "@/lib/calculations/narrative";
+import { useAutoCollapse } from "@/lib/utilities/useAutoCollapse";
 import { downloadReportPdf } from "@/lib/utilities/pdf";
 import { useApp } from "@/lib/state/store";
 import type { AnalysisResult } from "@/types/finance";
@@ -29,24 +30,17 @@ function Page({ a }: { a: AnalysisResult }) {
   const { active, toast } = useApp();
   const [phase, setPhase] = useState<"idle" | "gen" | "done">("idle");
   const [stamp, setStamp] = useState<Date | null>(null);
-  const [open, setOpen] = useState<Set<string>>(new Set(["summary"]));
+  const [open, setOpen] = useState<Set<string>>(new Set());
   const base = useMemo(() => buildReport(a), [a]);
   const secs = base;
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const h = window.location.hash;
-    if (h.startsWith("#sec-") || h === "#pdf") {
-      setPhase("done"); setStamp(new Date()); setOpen(new Set(h.startsWith("#sec-") ? [h.slice(5)] : ["summary"]));
-      if (h.startsWith("#sec-")) setTimeout(() => document.getElementById(h.slice(1))?.scrollIntoView({ behavior: "smooth", block: "start" }), 400);
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+
   const [pdfBusy, setPdfBusy] = useState(false);
+  useAutoCollapse(open.size > 0, () => setOpen(new Set()));
   const complete = a.risk.coverage;
 
   const generate = () => {
     setPhase("gen");
-    setTimeout(() => { setPhase("done"); setStamp(new Date()); setOpen(new Set(["summary"])); toast("Report generated", "pos"); }, 2000);
+    setTimeout(() => { setPhase("done"); setStamp(new Date()); setOpen(new Set()); toast("Report generated", "pos"); }, 2000);
   };
   const toggle = (id: string) => setOpen((o) => { const n = new Set(o); n.has(id) ? n.delete(id) : n.add(id); return n; });
   const jump = (id: string) => { setOpen((o) => new Set(o).add(id)); setTimeout(() => document.getElementById(`sec-${id}`)?.scrollIntoView({ behavior: "smooth", block: "start" }), 60); };

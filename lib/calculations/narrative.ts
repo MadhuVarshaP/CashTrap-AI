@@ -78,7 +78,7 @@ export function buildReport(a: AnalysisResult): ReportSection[] {
   const fcf = c.operatingCashFlow != null && c.capex != null ? c.operatingCashFlow - c.capex : null;
   const flagged = inds.filter((i) => i.level === "High" || i.level === "Critical").sort((x, y) => (y.points ?? 0) - (x.points ?? 0));
   const lvl = (i: { level: Severity | null; points: number | null; max: number }) => `${levelName(i.level)}, ${i.points}/${i.max} pts`;
-  const line = (i: ReturnType<typeof ind>) => i.applicable ? (i.points != null ? f(`${i.name}: ${i.actual} (${lvl(i)}). ${i.explanation}`) : miss(`${i.name}: Not Assessed. Needs ${i.requires.join(" and ").toLowerCase()}.`)) : miss(`${i.name}: Not Applicable to ${ctx.name}; excluded from the score.`);
+  const line = (i: ReturnType<typeof ind>) => i.applicable ? (i.points != null ? f(`${i.name}: ${i.actual} (${lvl(i)}).`) : miss(`${i.name}: Not Assessed. Needs ${i.requires.join(" and ").toLowerCase()}.`)) : miss(`${i.name}: Not Applicable to ${ctx.name}; excluded from the score.`);
   const bridge = buildBridge(a).find((b) => b.year === c.year);
   const lev = m.netDebt != null && e != null && e > 0 ? m.netDebt / e : null;
 
@@ -100,7 +100,7 @@ export function buildReport(a: AnalysisResult): ReportSection[] {
     vs("ebitdaMargin", m.ebitdaMargin == null ? null : m.ebitdaMargin * 100, "EBITDA margin"),
     f(`FY${c.year}: revenue ${fmtM(c.revenue)} (${pctS(rg)}), EBITDA ${fmtM(c.ebitda)} (${pctS(eg)}), operating cash flow ${fmtM(c.operatingCashFlow)} (${pctS(og)}). ${e != null && c.operatingCashFlow != null && e > 0 ? `Operating cash flow was ${fmtPct(c.operatingCashFlow / e, 0)} of adjusted EBITDA.` : ""}`),
     f(m.netDebt != null ? (m.netDebt <= 0 ? `Net cash position of ${fmtM(-m.netDebt)}.` : `Net debt ${fmtM(m.netDebt)}${lev != null ? `, ${fmtX(lev)} adjusted EBITDA` : ""}.`) : "Net debt could not be computed from the supplied data."),
-    ...(findings.length ? [f(`Most important concerns, largest first: ${findings.map((x) => x.title.toLowerCase()).join("; ")}.`), ...findings.map((x) => x.impact ? est(`${x.title}: ${x.impact}.`) : f(`${x.title}: ${x.evidence}.`))] : [f("No applicable indicator scored risk points on the data supplied.")]),
+    ...(findings.length ? [f(`Most important concerns, largest first: ${findings.map((x) => `${x.title.toLowerCase()}${x.impact ? ` (${x.impact})` : ""}`).join("; ")}.`)] : [f("No applicable indicator scored risk points on the data supplied.")]),
     asm("Investment risk and investment attractiveness are separate questions. The score is not a probability of failure, and this report makes no buy or reject recommendation."),
     ...(risk.coverage < 100 ? [miss(`${100 - risk.coverage}% of the applicable model could not be assessed because data was not supplied; the score is incomplete.`)] : []),
   ];
@@ -113,7 +113,7 @@ export function buildReport(a: AnalysisResult): ReportSection[] {
     e != null && c.operatingCashFlow != null ? f(e > 0 ? `EBITDA-to-operating-cash conversion is ${fmtPct(c.operatingCashFlow / e, 0)}: ${fmtM(e - c.operatingCashFlow)} of adjusted EBITDA did not arrive as operating cash. ${ind("ocf").bench?.status === "unavailable" ? "Industry Benchmark Unavailable for cash conversion; it is scored on a proposed screening threshold (" + ind("ocf").benchmark + ")." : ""}` : "EBITDA is not positive, so cash conversion is not meaningful.") : miss("Cash conversion could not be computed."),
     ...(fcf != null ? [f(`Free cash flow is ${fmtM(fcf)} after capex of ${fmtM(c.capex)}${fcf < 0 ? ": operating cash flow does not cover capex, so the business is consuming cash after investment" : ""}.`)] : [miss("Capital expenditure not supplied: free cash flow cannot be computed.")]),
     ...(bridge && bridge.gap != null ? [f(`EBITDA-to-cash bridge FY${bridge.year}: the ${fmtM(bridge.gap)} cash gap splits into working-capital movement ${fmtM(bridge.wcIncrease)}, cash taxes ${bridge.taxes == null ? "not supplied" : fmtM(bridge.taxes)}, cash interest ${bridge.interest == null ? "not supplied" : fmtM(bridge.interest)} and other ${fmtM(bridge.drivers[3].value)}. Only the working-capital line is working capital.`)] : []),
-    ...["adj", "revq", "margin", "vol", "ocf", "fcf", "cons"].map(ind).filter((i) => i.applicable && i.points != null && i.points > 0).map(line),
+    ...["adj", "revq", "margin", "vol", "cons"].map(ind).filter((i) => i.applicable && i.points != null && i.points > 0).map(line),
     ...((ind("revq").points ?? 0) > 0 ? [hyp("Interpretation, not a calculated finding: revenue growth that is not collected may reflect looser credit terms, customer concentration or revenue recognised ahead of billing.")] : []),
   ];
 
@@ -127,7 +127,7 @@ export function buildReport(a: AnalysisResult): ReportSection[] {
     ctx.relevance("dio") === "na" ? miss(`Inventory days (DIO) are Not Applicable to ${ctx.name}.`) : vs("dio", m.dio, "DIO"),
     vs("dpo", m.dpo, "DPO"),
     vs("ccc", m.ccc, "Cash conversion cycle (diagnostic, not scored)"),
-    ...["dso", "dio", "dpo", "owc"].map(ind).filter((i) => i.applicable && i.points != null && (i.points ?? 0) > 0).map(line),
+    ...[ind("owc")].filter((i) => i.applicable && i.points != null).map(line),
     ...(dsoTie != null && dsoTie > 0 ? [est(`Slower collections tie up about ${fmtM(dsoTie)} more cash than at last year's DSO.`)] : []),
     ...(dioTie != null && dioTie > 0 ? [est(`Slower stock turnover ties up about ${fmtM(dioTie)} more cash than at last year's DIO.`)] : []),
     ...(rel.total != null && rel.total > 0 ? [est(`Returning DSO and DIO to FY${p?.year} levels would release about ${fmtM(rel.total)} (receivables ${fmtM(rel.receivables)}, inventory ${fmtM(rel.inventory)}). One-off cash, not guaranteed.`)] : []),
@@ -142,7 +142,7 @@ export function buildReport(a: AnalysisResult): ReportSection[] {
     f(c.debt != null && c.cash != null ? `Total debt ${fmtM(c.debt)}, cash ${fmtM(c.cash)}, net debt ${fmtM(c.debt - c.cash)}${lev != null ? `: ${fmtX(lev)} adjusted EBITDA` : ""}.` : "Debt and cash were not both supplied, so net debt cannot be computed."),
     ctx.relevance("lev") === "na" ? miss(`Net debt / EBITDA is Not Applicable to ${ctx.name}.`) : vs("debtEbitda", lev, "Net debt / adjusted EBITDA (the benchmark is gross debt incl. leases, so this comparison is conservative)"),
     ctx.relevance("int") === "na" ? miss(`Interest coverage is Not Applicable to ${ctx.name}.`) : vs("intCover", c.interestExpense && c.interestExpense > 0 && e != null ? e / c.interestExpense : null, "Interest coverage on EBITDA (the benchmark is EBIT-based, so the company figure runs higher)"),
-    ...["lev", "int", "dscr", "mat", "liqr"].map(ind).filter((i) => i.applicable).map(line),
+    ...["dscr", "mat", "liqr"].map(ind).filter((i) => i.applicable).map(line),
     ...(v.postLeverage != null ? [f(`Post-deal: net debt ${fmtM(v.postNetDebt)} (existing net debt + proposed acquisition debt − cash used) is ${fmtX(v.postLeverage)} adjusted EBITDA.`)] : [miss("No acquisition financing entered, so post-deal leverage is unavailable.")]),
     ...(c.principalRepayment == null ? [miss("Scheduled principal repayment not supplied: debt service coverage and maturity risk are limited.")] : []),
   ];
@@ -154,7 +154,7 @@ export function buildReport(a: AnalysisResult): ReportSection[] {
   const rDown = vr ? scenarioReturns(a, vr.growth - 5, vr.holdYears, Math.max(0.5, vr.exitMultiple - 1), "scenario") : null;
   const rUp = vr ? scenarioReturns(a, vr.growth + 3, vr.holdYears, vr.exitMultiple + 1, "scenario") : null;
   const s5: ReportItem[] = [
-    asm("Scenario analysis only: hypothetical results built on the latest actual year, not forecasts. Assumptions are editable on the Stress Testing page."),
+    asm("Scenario analysis only: hypothetical results built on the latest actual year, not forecasts. "),
     est(`Base case (FY${c.year} held constant): ${fx(base)}.`),
     est(`Downside case (revenue −${DOWNSIDE_CASE.revenueDrop}%, margin −${DOWNSIDE_CASE.marginDrop} pp, DSO +${DOWNSIDE_CASE.dsoIncrease}d, DIO +${DOWNSIDE_CASE.dioIncrease}d, rates +${DOWNSIDE_CASE.interestRise} pp): ${fx(down)}.`),
     est(`Severe stress case (revenue −${SEVERE_CASE.revenueDrop}%, margin −${SEVERE_CASE.marginDrop} pp, DSO +${SEVERE_CASE.dsoIncrease}d, DIO +${SEVERE_CASE.dioIncrease}d, rates +${SEVERE_CASE.interestRise} pp): ${fx(sev)}.`),

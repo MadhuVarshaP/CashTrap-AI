@@ -301,9 +301,8 @@ export function assessRisk(records: FinancialRecord[], metrics: YearMetrics[], i
     else if (id === "dpo") { if (b.high != null) lv = v > 1.5 * b.high ? "Medium" : "Low"; }
     else if (b.high != null) lv = v <= b.high ? "Low" : v <= 1.25 * b.high ? "Medium" : v <= 1.5 * b.high ? "High" : "Critical";
     if (lv == null) return;
-    const cmp = `${METRIC[m].label} ${fmtBench(v, m)} against a ${ctx.name} median of ${fmtBench(b.median, m)} (typical range ${benchRange(b, m)}).`;
-    if (i.level == null) { setLevel(i, lv); i.actual = fmtBench(v, m); i.explanation = `Assessed on the industry benchmark alone (no prior year to measure a trend). ${cmp}`; i.requires = []; }
-    else { const w = worst(i.level, lv); if (w !== i.level) { setLevel(i, w); i.explanation += ` Raised to ${levelName(w)} because the level is outside the industry benchmark. ${cmp}`; } else i.explanation += ` ${cmp}`; }
+    if (i.level == null) { setLevel(i, lv); i.actual = fmtBench(v, m); i.explanation = `Assessed on the industry benchmark alone: there is no prior year to measure a trend.`; i.requires = []; }
+    else { const w = worst(i.level, lv); if (w !== i.level) { setLevel(i, w); i.explanation += ` Raised to ${levelName(w)} because the level is outside the industry benchmark.`; } }
   };
   (["dso", "dio", "dpo", "margin"] as const).forEach(vsBench);
   { // the cash conversion cycle is a diagnostic only: shown against its benchmark on the working-capital indicator, never scored
