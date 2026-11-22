@@ -15,12 +15,16 @@ const ALIASES: Record<string, Col> = {
   debt: "debt", totaldebt: "debt", borrowings: "debt",
 };
 /** optional columns used by the Investment Risk Analysis pillars */
-type OptKey = "capex" | "interestExpense" | "currentAssets" | "currentLiabilities" | "principalRepayment" | "shortTermDebt";
+type OptKey = "capex" | "interestExpense" | "currentAssets" | "currentLiabilities" | "principalRepayment" | "shortTermDebt" | "cashTaxes" | "ebitdaAdjustment" | "creditSales" | "creditPurchases";
 const OPT_ALIASES: Record<string, OptKey> = {
   capex: "capex", capitalexpenditure: "capex", capitalexpenditures: "capex",
   interestexpense: "interestExpense", cashinterestexpense: "interestExpense", financecosts: "interestExpense", interest: "interestExpense",
   currentassets: "currentAssets", currentliabilities: "currentLiabilities",
   scheduledprincipalrepayment: "principalRepayment", principalrepayment: "principalRepayment", scheduledprincipal: "principalRepayment",
+  cashtaxes: "cashTaxes", taxespaid: "cashTaxes", incometaxpaid: "cashTaxes", cashtaxespaid: "cashTaxes",
+  ebitdaadjustments: "ebitdaAdjustment", ebitdaadjustment: "ebitdaAdjustment", adjustments: "ebitdaAdjustment", normalisationadjustments: "ebitdaAdjustment",
+  creditsales: "creditSales", annualcreditsales: "creditSales",
+  annualpurchases: "creditPurchases", purchases: "creditPurchases", creditpurchases: "creditPurchases", annualcreditpurchases: "creditPurchases",
   shorttermdebt: "shortTermDebt", debtdue12months: "shortTermDebt", currentportionofdebt: "shortTermDebt",
 };
 
@@ -31,6 +35,8 @@ export interface ParseMeta {
   unitMultiplier?: number;
   name?: string;
   synthetic?: boolean;
+  /** ISO-style currency found in the file header, if any */
+  currency?: string;
 }
 
 export interface ParseResult {
@@ -87,7 +93,7 @@ function parseStatements(wb: XLSX.WorkBook): ParseResult {
 
   const header = is.slice(0, 5).map((r) => String(r[0] ?? "")).join(" ");
   const unitMultiplier = /million|aed\s*m\b/i.test(header) ? 1_000_000 : /'000|thousand/i.test(header) ? 1_000 : 1;
-  const meta: ParseMeta = { unitMultiplier, synthetic: /synthetic/i.test(header), name: String(is[0]?.[0] ?? "").trim() || "Uploaded company" };
+  const meta: ParseMeta = { unitMultiplier, currency: /\b(AED|USD|EUR|GBP|SAR|QAR|KWD|OMR|BHD|EGP|INR|JPY|CNY|CHF)\b/.exec(header)?.[1], synthetic: /synthetic/i.test(header), name: String(is[0]?.[0] ?? "").trim() || "Uploaded company" };
 
   const isCols = yearColumns(is), bsCols = yearColumns(bs), cfCols = cf ? yearColumns(cf) : new Map<number, number>();
   const years = [...isCols.keys()].sort((a, b) => a - b);
@@ -106,6 +112,8 @@ function parseStatements(wb: XLSX.WorkBook): ParseResult {
   const ocf = cf ? findRow(cf, /^net cash (from|generated from|provided by) operating/) : undefined;
   const capexRow = cf ? findRow(cf, /^purchase of (property|plant|fixed)/, /^capital expenditure/, /^(additions to|acquisition of) (property|fixed)/) : undefined;
   const interestRow = findRow(is, /^finance costs?$/, /^interest expense/, /^finance expense/);
+  const interestPaid = cf ? findRow(cf, /^finance costs? paid/, /^interest paid/) : undefined;
+  const taxPaid = cf ? findRow(cf, /^income tax(es)? paid/, /^taxes? paid/, /^tax paid/) : undefined;
   const caRow = findRow(bs, /^total current assets/), clRow = findRow(bs, /^total current liabilities/);
   const cpRow = findRow(bs, /^current portion of (term )?loans/), stRow = findRow(bs, /^short-term (bank )?borrowings/);
 
@@ -127,7 +135,8 @@ function parseStatements(wb: XLSX.WorkBook): ParseResult {
       operatingCashFlow: num(ocf, cfCols.get(y)), cash: num(cash, b), debt: debtAt(y),
     };
     if (capexRow) { const v = num(capexRow, cfCols.get(y)); r.capex = v == null ? null : Math.abs(v); }
-    if (interestRow) { const v = num(interestRow, c); r.interestExpense = v == null ? null : Math.abs(v); }
+    if (interestPaid || interestRow) { const v = interestPaid ? num(interestPaid, cfCols.get(y)) : num(interestRow, c); r.interestExpense = v == null ? null : Math.abs(v); }
+    if (taxPaid) { const v = num(taxPaid, cfCols.get(y)); r.cashTaxes = v == null ? null : Math.abs(v); }
     if (caRow) r.currentAssets = num(caRow, b);
     if (clRow) r.currentLiabilities = num(clRow, b);
     if (cpRow) r.principalRepayment = num(cpRow, b); // current portion of term loans = principal due in the next 12 months
@@ -167,7 +176,7 @@ function parseWide(wb: XLSX.WorkBook): ParseResult | null {
     const magnitude = /magnitude:\s*billions?/i.test(head) ? 1_000_000_000 : /magnitude:\s*thousands?/i.test(head) ? 1_000 : /magnitude:\s*millions?/i.test(head) || /million|\bdhs?\.?\s*m\b/i.test(head) ? 1_000_000 : 1;
     const currency = /currency:\s*([^|(]*?)\s*(\((\w{3})\))?\s*(\||$)/i.exec(head)?.[3] ?? "";
     const title = String(rows.find((r) => /\|/.test(String(r[0] ?? "")))?.[0] ?? "");
-    const meta: ParseMeta = { unitMultiplier: magnitude, synthetic: false, name: title.split("|")[0].trim() || name };
+    const meta: ParseMeta = { unitMultiplier: magnitude, currency: /currency:[^|]*\((\w{3})\)/i.exec(head)?.[1], synthetic: false, name: title.split("|")[0].trim() || name };
 
     const gross = find(/^gross profit$/), cogsRow = find(/^(total )?cost of (goods sold|revenue|sales)/);
     const ebitda = find(/^ebitda$/), ocf = find(/^cash from ops/, /^net cash (from|provided by) operating/);
@@ -251,6 +260,8 @@ export async function parseFinancialFile(file: File): Promise<ParseResult> {
   if (!found.has("year")) return { records: [], errors: ["Missing required column: Year. Upload a flat table (Year, Revenue, COGS, …), a workbook with “Income Statement” and “Balance Sheet” sheets, or an S&P Capital IQ Financial Highlights export."], warnings };
   const absent = (["revenue", "cogs", "ebitda", "receivables", "inventory", "payables", "operatingCashFlow", "cash", "debt"] as const).filter((f) => !found.has(f));
   if (absent.length) warnings.push(`Columns not found: ${absent.join(", ")}. Dependent indicators will be marked unavailable.`);
+  const noOpt = (["capex", "cashTaxes", "interestExpense", "principalRepayment", "currentAssets", "currentLiabilities"] as const).filter((k) => !Object.values(optMap).includes(k));
+  if (noOpt.length) warnings.push(`Optional columns not found: ${noOpt.join(", ")}. The EBITDA-to-cash bridge, debt-service and liquidity indicators need them and will show “not supplied”.`);
 
   const records: FinancialRecord[] = [];
   const seen = new Set<number>();
@@ -269,7 +280,7 @@ export async function parseFinancialFile(file: File): Promise<ParseResult> {
     for (const [h, key] of Object.entries(optMap)) {
       const raw = row[h];
       const n = raw == null || raw === "" ? NaN : typeof raw === "number" ? raw : Number(String(raw).replace(/[,\s]/g, "").replace(/^\((.*)\)$/, "-$1"));
-      rec[key] = Number.isFinite(n) ? (key === "capex" ? Math.abs(n) : n) : null;
+      rec[key] = Number.isFinite(n) ? (key === "capex" || key === "cashTaxes" ? Math.abs(n) : n) : null;
     }
     if (!Number.isInteger(rec.year) || rec.year < 1990 || rec.year > 2100) return void errors.push(`Row ${idx + 2}: invalid Year.`);
     if (seen.has(rec.year)) return void errors.push(`Row ${idx + 2}: duplicate year ${rec.year}.`);
@@ -289,4 +300,4 @@ export const dataQuality = (records: FinancialRecord[]) => {
 };
 
 export const SAMPLE_CSV =
-  "Year,Revenue,COGS,EBITDA,Receivables,Inventory,Payables,Operating_Cash_Flow,Cash,Debt\n2023,412,289,62,58,52,41,49,38,142\n2024,448,316,71,84,71,44,38,31,168\n2025,471,337,79,112,96,45,24,22,196\n";
+  "Year,Revenue,COGS,EBITDA,EBITDA_Adjustments,Receivables,Inventory,Payables,Operating_Cash_Flow,Capex,Cash_Taxes,Cash,Debt,Cash_Interest,Current_Assets,Current_Liabilities,Scheduled_Principal,Annual_Purchases\n2023,412,289,62,,58,52,41,49,30,6,38,142,11,156,123,14,\n2024,448,316,71,,84,71,44,38,38,7,31,168,13.5,196,145,15,\n2025,471,337,79,,112,96,45,24,41,8,22,196,17,242,168,17,\n";

@@ -2,6 +2,11 @@ import type { Num } from "@/types/finance";
 
 export const DASH = "—";
 
+/** reporting currency label for the active company (set by the app store); monetary figures are shown in millions of it */
+let CUR = "AED";
+export const setCurrency = (c?: string) => { CUR = c || "AED"; };
+export const cur = () => CUR;
+
 /** scales AED millions so very large companies stay readable: 10,000m → bn, 1,000,000m → tn */
 export const scaleM = (v: number, d = 1): { n: string; unit: string } => {
   const a = Math.abs(v);
@@ -12,7 +17,7 @@ export const scaleM = (v: number, d = 1): { n: string; unit: string } => {
 export const fmtM = (v: Num | undefined, d = 1): string => {
   if (v == null || !isFinite(v)) return DASH;
   const { n, unit } = scaleM(v, d);
-  return `AED ${n}${unit}`;
+  return `${CUR} ${n}${unit}`;
 };
 
 export const fmtNum = (v: Num | undefined, d = 1): string =>

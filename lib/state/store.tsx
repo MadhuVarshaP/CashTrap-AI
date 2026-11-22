@@ -5,6 +5,7 @@ import type { AnalysisResult, AssessmentInputs, Dataset, HistoryItem } from "@/t
 import { GULFTECH, NO_COMPANY } from "@/lib/demo-data/gulftech";
 import { analyze } from "@/lib/calculations/analyze";
 import { analyzeRemote } from "@/lib/api/client";
+import { setCurrency } from "@/lib/utilities/format";
 
 export type Status = "idle" | "processing" | "done" | "failed";
 
@@ -113,6 +114,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const active = datasets.find((d) => d.id === activeId) ?? NO_COMPANY;
 
+  setCurrency(active.inputs?.currency); // monetary labels follow the company's reporting currency
+
   const dismissPopup = useCallback((id: string) => setPopups((p) => p.filter((x) => x !== id)), []);
 
   /** adds to the bell feed, pops up immediately, and (if allowed and the tab is hidden) raises a desktop notification */
@@ -153,7 +156,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setError(null);
   }, []);
 
-  /** loads the synthetic GulfTech sample, pre-analysed, only when the user asks for it */
+  /** loads the GulfTech sample company, pre-analysed, only when the user asks for it */
   const loadDemo = useCallback(() => {
     setDatasets((all) => (all.some((d) => d.id === GULFTECH.id) ? all : [...all, GULFTECH]));
     setResults((r) => ({ ...r, [GULFTECH.id]: r[GULFTECH.id] ?? analyze(GULFTECH) }));
