@@ -8,7 +8,7 @@ import { chartTooltip } from "@/components/shared/ui";
 const axis = { stroke: "var(--c-axis)", fontSize: 11, tickLine: false, axisLine: false } as const;
 const grid = <CartesianGrid stroke="var(--c-grid)" vertical={false} />;
 const fy = (y: number) => `FY${String(y).slice(2)}`;
-export const COLORS = { revenue: "#3988F5", ebitda: "#35C994", ocf: "#F5A640", ai: "#A78BFA", crit: "#F06464", muted: "var(--c-axis)" };
+export const COLORS = { revenue: "#3B6CFF", ebitda: "#10B981", ocf: "#F59E0B", ai: "#8B5CF6", crit: "#F43F5E", muted: "var(--c-axis)" };
 
 export type Series = "revenue" | "ebitda" | "ocf";
 const label: Record<Series, string> = { revenue: "Revenue", ebitda: "EBITDA", ocf: "Operating cash flow" };
@@ -38,7 +38,7 @@ export function TrendChart({ a, series, mode, from }: { a: AnalysisResult; serie
 
 export type WC = "dso" | "dio" | "dpo" | "ccc";
 export const WC_LABEL: Record<WC, string> = { dso: "DSO", dio: "DIO", dpo: "DPO", ccc: "CCC" };
-const wcColor: Record<WC, string> = { dso: "#3988F5", dio: "#A78BFA", dpo: "#35C994", ccc: "#F06464" };
+const wcColor: Record<WC, string> = { dso: "#3B6CFF", dio: "#8B5CF6", dpo: "#10B981", ccc: "#F43F5E" };
 
 export function WorkingCapitalChart({ a, show }: { a: AnalysisResult; show: WC[] }) {
   const data = a.metrics.map((m) => ({ year: fy(m.year) + (m.approximate ? "*" : ""), dso: m.dso, dio: m.dio, dpo: m.dpo, ccc: m.ccc }));
@@ -66,7 +66,7 @@ export function DivergenceChart({ a }: { a: AnalysisResult }) {
         <XAxis dataKey="year" {...axis} />
         <YAxis {...axis} width={44} />
         <Tooltip {...chartTooltip} formatter={(v: number | number[], n: string) => (n === "gap" ? [`${cur()} ${(((v as number[])[1] - (v as number[])[0])).toFixed(1)}m`, "Cash gap"] : [`${cur()} ${(v as number).toFixed(1)}m`, n === "ebitda" ? "EBITDA" : "Operating cash flow"])} />
-        <Area type="monotone" dataKey="gap" stroke="none" fill="#F06464" fillOpacity={0.16} animationDuration={700} />
+        <Area type="monotone" dataKey="gap" stroke="none" fill="#F43F5E" fillOpacity={0.16} animationDuration={700} />
         <Line type="monotone" dataKey="ebitda" stroke={COLORS.ebitda} strokeWidth={2.2} dot={{ r: 3.5, fill: "var(--c-card)", strokeWidth: 2 }} animationDuration={700} />
         <Line type="monotone" dataKey="ocf" stroke={COLORS.ocf} strokeWidth={2.2} dot={{ r: 3.5, fill: "var(--c-card)", strokeWidth: 2 }} animationDuration={700} />
       </ComposedChart>
@@ -124,8 +124,8 @@ export function CashBridge({ a }: { a: AnalysisResult }) {
         <YAxis {...axis} width={44} />
         <Tooltip {...chartTooltip} cursor={{ fill: "var(--c-cursor)" }} formatter={(_v, _n, p) => { const v = (p.payload as { v: number }).v; return [`${v >= 0 ? "+" : "−"}${cur()} ${Math.abs(v).toFixed(1)}m`, ""]; }} separator="" />
         <Bar dataKey="base" stackId="w" fill="transparent" isAnimationActive={false} />
-        <Bar dataKey="up" stackId="w" animationDuration={700}>{data.map((d, i) => <Cell key={i} fill={d.total ? "#3988F5" : "#35C994"} />)}</Bar>
-        <Bar dataKey="down" stackId="w" fill="#F06464" radius={[4, 4, 0, 0]} animationDuration={700} />
+        <Bar dataKey="up" stackId="w" animationDuration={700}>{data.map((d, i) => <Cell key={i} fill={d.total ? "#3B6CFF" : "#10B981"} />)}</Bar>
+        <Bar dataKey="down" stackId="w" fill="#F43F5E" radius={[4, 4, 0, 0]} animationDuration={700} />
       </BarChart>
     </ResponsiveContainer>
   );

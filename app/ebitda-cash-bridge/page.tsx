@@ -119,10 +119,10 @@ function Page({ a }: { a: AnalysisResult }) {
                 <Tooltip {...chartTooltip} formatter={(v: number, n: string) => (n === "conv" ? [`${v.toFixed(0)}%`, "Cash conversion"] : [fmtM(v), n === "adjusted" ? "Adjusted EBITDA" : n === "ocf" ? "Operating cash flow" : "Free cash flow"])} />
                 <Legend wrapperStyle={{ fontSize: 11, color: "var(--c-tick)" }} formatter={(v) => (v === "adjusted" ? "Adjusted EBITDA" : v === "ocf" ? "Operating cash flow" : v === "fcf" ? "Free cash flow" : "Cash conversion (right)")} />
                 <ReferenceLine yAxisId="l" y={0} stroke="var(--c-muted)" />
-                <RBar yAxisId="l" dataKey="adjusted" fill="#35C994" radius={[3, 3, 0, 0]} maxBarSize={22} animationDuration={600} />
-                <RBar yAxisId="l" dataKey="ocf" fill="#F5A640" radius={[3, 3, 0, 0]} maxBarSize={22} animationDuration={600} />
-                <RBar yAxisId="l" dataKey="fcf" fill="#3988F5" radius={[3, 3, 0, 0]} maxBarSize={22} animationDuration={600} />
-                <Line yAxisId="r" dataKey="conv" stroke="#A78BFA" strokeWidth={2.2} dot={{ r: 3.5, fill: "var(--c-card)", strokeWidth: 2 }} animationDuration={700} />
+                <RBar yAxisId="l" dataKey="adjusted" fill="#10B981" radius={[3, 3, 0, 0]} maxBarSize={22} animationDuration={600} />
+                <RBar yAxisId="l" dataKey="ocf" fill="#F59E0B" radius={[3, 3, 0, 0]} maxBarSize={22} animationDuration={600} />
+                <RBar yAxisId="l" dataKey="fcf" fill="#3B6CFF" radius={[3, 3, 0, 0]} maxBarSize={22} animationDuration={600} />
+                <Line yAxisId="r" dataKey="conv" stroke="#8B5CF6" strokeWidth={2.2} dot={{ r: 3.5, fill: "var(--c-card)", strokeWidth: 2 }} animationDuration={700} />
               </ComposedChart>
             </ResponsiveContainer>
           </div>

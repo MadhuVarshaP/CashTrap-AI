@@ -1,6 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
+import { ArrowRightLeft, Coins, Gauge, Landmark, TrendingUp, Wallet } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import clsx from "clsx";
@@ -43,12 +44,12 @@ function headline(a: AnalysisResult): Kpi[] {
   const sign = (v: number | null, d = 1, suf = "") => (v == null ? "" : `${v >= 0 ? "+" : "−"}${Math.abs(v).toFixed(d)}${suf}`);
   const cls = risk.classification;
   return [
-    { label: "Investment Risk Index", tip: "Weighted 0–100 screening score across five risk pillars. Higher = more identified financial risk. Not a probability of failure and not a recommendation.", value: risk.score, kind: "score", change: risk.score == null ? "Insufficient data" : `${cls} · confidence ${risk.confidence.level} · ${risk.coverage}% coverage`, tone: risk.score == null ? "neutral" : risk.score < 25 ? "pos" : risk.score < 50 ? "neutral" : "neg", trend: [a.previousScore, risk.score].filter((v): v is number => v != null) },
-    { label: "Adjusted EBITDA", tip: "Reported EBITDA plus adjustments marked verified. Unverified adjustments are not counted.", value: e, kind: "money", change: verified ? "incl. verified adjustments" : "= reported · none verified", tone: "neutral", trend: a.records.map((r, i) => adjustedEbitda(r, a.inputs, i === a.records.length - 1)).filter((v): v is number => v != null) },
-    { label: "EBITDA-to-OCF Conversion", tip: "Operating cash flow ÷ adjusted EBITDA. Above 80% is typically healthy; below 50% deserves scrutiny.", value: cv, kind: "pct", change: cv != null && pcv != null ? `${sign((cv - pcv) * 100, 1, " pp")} YoY` : "—", tone: cv == null ? "neutral" : cv >= 0.8 ? "pos" : cv < 0.5 ? "neg" : "neutral", trend: a.records.map((r, i) => conv(r, adjustedEbitda(r, a.inputs, i === a.records.length - 1))).filter((v): v is number => v != null).map((v) => v * 100) },
-    { label: "Net Debt / EBITDA", tip: "Net debt ÷ adjusted EBITDA. Negative means more cash than debt. Cut-offs are proposed screening values, not industry standards.", value: lev, kind: "x", change: nd != null && nd <= 0 ? "net cash position" : lev != null && pndE != null ? `${sign(lev - pndE, 2, "x")} YoY` : "—", tone: lev == null ? "neutral" : lev < 2 ? "pos" : lev > 3 ? "neg" : "neutral", trend: a.records.map((r, i) => { const x = adjustedEbitda(r, a.inputs, i === a.records.length - 1); return r.debt != null && r.cash != null && x != null && x > 0 ? (r.debt - r.cash) / x : null; }).filter((v): v is number => v != null) },
-    { label: "Potential WC Cash Release", tip: "Cash that would be released if DSO and DIO returned to last year's level. A one-off estimate using the company's own history, not guaranteed cash. Model your own targets in Cash Impact.", value: rel.total, kind: "money", change: rel.total == null ? "needs two years of days" : rel.total === 0 ? "no deterioration to reverse" : rel.basis, tone: "neutral", trend: [] },
-    { label: "Free Cash Flow", tip: "Operating cash flow − capital expenditure, after interest.", value: f1, kind: "money", change: f1 == null ? "capex not supplied" : f0 != null && f0 !== 0 ? `${sign(((f1 - f0) / Math.abs(f0)) * 100, 1, "%")} YoY` : "—", tone: f1 == null ? "neutral" : f1 < 0 ? "neg" : f0 != null && f1 > f0 ? "pos" : "neutral", trend: a.records.map(fcf).filter((v): v is number => v != null) },
+    { label: "Investment Risk Index", icon: Gauge, hue: "violet", tip: "Weighted 0–100 screening score across five risk pillars. Higher = more identified financial risk. Not a probability of failure and not a recommendation.", value: risk.score, kind: "score", change: risk.score == null ? "Insufficient data" : `${cls} · confidence ${risk.confidence.level} · ${risk.coverage}% coverage`, tone: risk.score == null ? "neutral" : risk.score < 25 ? "pos" : risk.score < 50 ? "neutral" : "neg", trend: [a.previousScore, risk.score].filter((v): v is number => v != null) },
+    { label: "Adjusted EBITDA", icon: TrendingUp, hue: "blue", tip: "Reported EBITDA plus adjustments marked verified. Unverified adjustments are not counted.", value: e, kind: "money", change: verified ? "incl. verified adjustments" : "= reported · none verified", tone: "neutral", trend: a.records.map((r, i) => adjustedEbitda(r, a.inputs, i === a.records.length - 1)).filter((v): v is number => v != null) },
+    { label: "EBITDA-to-OCF Conversion", icon: ArrowRightLeft, hue: "mint", tip: "Operating cash flow ÷ adjusted EBITDA. Above 80% is typically healthy; below 50% deserves scrutiny.", value: cv, kind: "pct", change: cv != null && pcv != null ? `${sign((cv - pcv) * 100, 1, " pp")} YoY` : "—", tone: cv == null ? "neutral" : cv >= 0.8 ? "pos" : cv < 0.5 ? "neg" : "neutral", trend: a.records.map((r, i) => conv(r, adjustedEbitda(r, a.inputs, i === a.records.length - 1))).filter((v): v is number => v != null).map((v) => v * 100) },
+    { label: "Net Debt / EBITDA", icon: Landmark, hue: "amber", tip: "Net debt ÷ adjusted EBITDA. Negative means more cash than debt. Cut-offs are proposed screening values, not industry standards.", value: lev, kind: "x", change: nd != null && nd <= 0 ? "net cash position" : lev != null && pndE != null ? `${sign(lev - pndE, 2, "x")} YoY` : "—", tone: lev == null ? "neutral" : lev < 2 ? "pos" : lev > 3 ? "neg" : "neutral", trend: a.records.map((r, i) => { const x = adjustedEbitda(r, a.inputs, i === a.records.length - 1); return r.debt != null && r.cash != null && x != null && x > 0 ? (r.debt - r.cash) / x : null; }).filter((v): v is number => v != null) },
+    { label: "Potential WC Cash Release", icon: Coins, hue: "mint", tip: "Cash that would be released if DSO and DIO returned to last year's level. A one-off estimate using the company's own history, not guaranteed cash. Model your own targets in Cash Impact.", value: rel.total, kind: "money", change: rel.total == null ? "needs two years of days" : rel.total === 0 ? "no deterioration to reverse" : rel.basis, tone: "neutral", trend: [] },
+    { label: "Free Cash Flow", icon: Wallet, hue: "rose", tip: "Operating cash flow − capital expenditure, after interest.", value: f1, kind: "money", change: f1 == null ? "capex not supplied" : f0 != null && f0 !== 0 ? `${sign(((f1 - f0) / Math.abs(f0)) * 100, 1, "%")} YoY` : "—", tone: f1 == null ? "neutral" : f1 < 0 ? "neg" : f0 != null && f1 > f0 ? "pos" : "neutral", trend: a.records.map(fcf).filter((v): v is number => v != null) },
   ];
 }
 
@@ -79,7 +80,7 @@ function Dashboard({ a }: { a: AnalysisResult }) {
           <div className="text-[12.5px] text-ink2">{active.industry}</div>
         </div>
         <div className="flex flex-wrap items-center gap-x-6 gap-y-2 font-mono text-[11.5px] text-ink2">
-          <span><span className="text-ink3">INDUSTRY </span>{a.risk.industry.selected ? a.risk.industry.name : <Link href="/investment-assessment" className="text-warn hover:underline">not selected</Link>}</span>
+          <span><span className="text-ink3">INDUSTRY </span>{a.risk.industry.selected ? a.risk.industry.name : <Link href="/company-analysis" className="text-warn hover:underline">not selected</Link>}</span>
           <span><span className="text-ink3">PERIOD </span>{years}</span>
           <span><span className="text-ink3">LAST RUN </span>{new Date(a.generatedAt).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}</span>
           <Pill tone="pos">● Analysis complete</Pill>
@@ -94,7 +95,7 @@ function Dashboard({ a }: { a: AnalysisResult }) {
         </div>
 
         {/* B2. concerns at a glance */}
-        <Card className="xl:col-span-12" hover={false}>
+        <Card tint="rose" className="xl:col-span-12" hover={false}>
           <CardHead title="Most significant concerns" hint="The three largest risks by points and quantified impact, from calculated figures only. Potential risks to investigate, not conclusions." right={<Link href="/investment-assessment" className="text-[12px] text-accent hover:underline">Full risk analysis →</Link>} />
           {concerns.length === 0 ? <p className="text-[13px] text-ink2">No indicator scored risk points on the data supplied.</p> : (
             <div className="grid gap-3 lg:grid-cols-3">
@@ -117,7 +118,7 @@ function Dashboard({ a }: { a: AnalysisResult }) {
         <CashConversionChart a={a} />
 
         {/* C. trend chart */}
-        <Card id="performance" className="scroll-mt-24 xl:col-span-7">
+        <Card id="performance" tint="blue" className="scroll-mt-24 xl:col-span-7">
           <CardHead title="Financial performance" hint="Profit and cash generation over time. Divergence between EBITDA and operating cash flow is the key signal." right={
             <div className="flex flex-wrap gap-2">
               <Tabs label="Mode" value={mode} onChange={setMode} items={[{ id: "indexed", label: "Indexed" }, { id: "absolute", label: cur() + " m" }]} />
@@ -133,13 +134,13 @@ function Dashboard({ a }: { a: AnalysisResult }) {
         </Card>
 
         {/* leverage trend */}
-        <Card className="xl:col-span-5">
+        <Card tint="amber" className="xl:col-span-5">
           <CardHead title="Leverage trend" hint="Total debt, cash and net debt ÷ adjusted EBITDA. Dashed lines mark 3x and 4x (proposed screening levels)." />
           <div className="h-[250px]"><DebtChart a={a} /></div>
         </Card>
 
         {/* D. working capital */}
-        <Card className="xl:col-span-12">
+        <Card tint="mint" className="xl:col-span-12">
           <CardHead title="Working capital cycle" hint="DSO + DIO − DPO = cash conversion cycle: the days cash is tied up between paying suppliers and collecting from customers." right={
             <div className="flex gap-1.5">{(["dso", "dio", "dpo", "ccc"] as WC[]).map((k) => (
               <button key={k} onClick={() => setWc(toggle(wc, k))} aria-pressed={wc.includes(k)} className={clsx("rounded-lg border px-2.5 py-1 font-mono text-[11px]", wc.includes(k) ? "border-accent/40 bg-accent/10 text-ink" : "border-line text-ink3")}>{WC_LABEL[k]}</button>

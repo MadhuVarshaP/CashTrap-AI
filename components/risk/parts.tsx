@@ -9,7 +9,7 @@ import { useAutoCollapse } from "@/lib/utilities/useAutoCollapse";
 import { levelName } from "@/lib/calculations/pe-risk";
 import type { Indicator, Severity } from "@/types/finance";
 
-export const LEVEL_HEX: Record<Severity, string> = { Low: "#35C994", Medium: "#F5A640", High: "#F58B5C", Critical: "#F06464" };
+export const LEVEL_HEX: Record<Severity, string> = { Low: "#10B981", Medium: "#F59E0B", High: "#FB7C3C", Critical: "#F43F5E" };
 
 export function LevelBadge({ level, className, na }: { level: Severity | null; className?: string; na?: boolean }) {
   if (na) return <span className={clsx("inline-flex items-center gap-1.5 rounded-full border border-dashed border-line px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider text-ink3", className)}><CircleSlash size={10} />Not applicable</span>;
@@ -93,7 +93,7 @@ export function NumInput({ label, value, unit, onCommit, hint, step = "any" }: {
 }
 
 export const Stat = ({ label, value, sub, tone }: { label: string; value: string; sub?: string; tone?: "crit" | "pos" | "warn" }) => (
-  <div className="rounded-xl border border-line bg-bg2 p-3.5">
+  <div className="rounded-xl border border-line bg-gradient-to-br from-white to-bg2 p-3.5 shadow-sm">
     <div className="font-mono text-[10px] uppercase tracking-wider text-ink3">{label}</div>
     <div className={clsx("mt-1 font-display text-[20px] font-semibold tabular-nums", tone === "crit" && "text-crit", tone === "pos" && "text-pos", tone === "warn" && "text-warn")}>{value}</div>
     {sub && <div className="mt-0.5 font-mono text-[10.5px] text-ink3">{sub}</div>}

@@ -13,7 +13,7 @@ export interface Step {
   color?: string;
 }
 
-const POS = "#35C994", NEG = "#F06464", TOTAL = "#3988F5", MISS = "var(--c-muted)";
+const POS = "#10B981", NEG = "#F43F5E", TOTAL = "#3B6CFF", MISS = "var(--c-muted)";
 const axisM = (v: number) => { const { n, unit } = scaleM(v, 0); return `${n}${unit}`; };
 
 /** floating-bar waterfall; negative and zero-crossing movements are drawn as they are, never hidden */

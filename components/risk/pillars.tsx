@@ -23,7 +23,7 @@ export function PillarRadar({ risk }: { risk: RiskResult }) {
           <PolarAngleAxis dataKey="name" tick={{ fill: "var(--c-tick)", fontSize: 11 }} />
           <PolarRadiusAxis domain={[0, 100]} tick={false} axisLine={false} />
           <Tooltip {...chartTooltip} formatter={(v: number, _n: string, p: { payload?: { na?: boolean } }) => [p.payload?.na ? "Not Assessed" : `${v}% of assessable points`, "Risk"]} />
-          <Radar dataKey="risk" stroke="#3988F5" fill="#3988F5" fillOpacity={0.28} strokeWidth={2} animationDuration={700} />
+          <Radar dataKey="risk" stroke="#3B6CFF" fill="#3B6CFF" fillOpacity={0.28} strokeWidth={2} animationDuration={700} />
         </RadarChart>
       </ResponsiveContainer>
     </div>
@@ -90,7 +90,7 @@ export function PillarSection({ risk }: { risk: RiskResult }) {
   useAutoCollapse(openId !== null, () => setOpenId(null));
   return (
     <div className="grid gap-5 xl:col-span-12 xl:grid-cols-12">
-      <Card className="xl:col-span-5">
+      <Card tint="blue" className="xl:col-span-5">
         <CardHead title="Financial health: five risk pillars" hint="Each spoke is the share of that pillar's assessable points that scored as risk. Further out = more risk. Not Assessed pillars sit at the centre." />
         <PillarRadar risk={risk} />
         <p className="mt-2 font-mono text-[10.5px] text-ink3">WEIGHTS 25 · 25 · 20 · 20 · 10 · COVERAGE {risk.coverage}% · CONFIDENCE {risk.confidence.level.toUpperCase()}</p>

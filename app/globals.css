@@ -4,22 +4,31 @@
 
 /* light theme: tokens are RGB triplets so Tailwind opacity modifiers keep working */
 :root {
-  --bg: 243 245 248; --bg2: 247 248 250; --card: 255 255 255; --elev: 238 241 246;
-  --line: 229 232 238; --line2: 205 211 221;
-  --ink: 20 24 33; --ink2: 82 90 105; --ink3: 125 133 148;
-  --accent: 47 120 238; --pos: 20 160 110; --warn: 217 133 20; --crit: 222 69 69; --ai: 124 92 224;
+  --bg: 240 243 255; --bg2: 246 248 255; --card: 255 255 255; --elev: 233 238 252;
+  --line: 222 228 246; --line2: 194 204 236;
+  --ink: 16 20 45; --ink2: 70 80 120; --ink3: 117 127 164;
+  --accent: 37 99 255; --pos: 16 185 129; --warn: 245 158 11; --crit: 244 63 94; --ai: 139 92 246;
   /* chart / SVG colours */
-  --c-grid: #E8EBF0; --c-axis: #8A91A0; --c-tick: #525A69; --c-muted: #CBD0D9; --c-card: #FFFFFF; --c-elev: #EEF1F6; --c-line: #E4E7EE; --c-cursor: rgba(20,24,33,.05); --c-ink: #141821;
+  --c-grid: #E5E9F8; --c-axis: #8A93BB; --c-tick: #48527A; --c-muted: #CCD3EE; --c-card: #FFFFFF; --c-elev: #E9EEFC; --c-line: #DEE4F6; --c-cursor: rgba(37,99,255,.07); --c-ink: #10142D;
 }
 html { background: rgb(var(--bg)); color-scheme: light; }
-body { background: rgb(var(--bg)); color: rgb(var(--ink)); }
+/* soft colour washes behind the content: blue top-left, violet top-right, mint at the bottom */
+body {
+  color: rgb(var(--ink));
+  background:
+    radial-gradient(900px 520px at 6% -4%, rgba(96,140,255,.26), transparent 62%),
+    radial-gradient(820px 520px at 100% 2%, rgba(170,120,255,.20), transparent 62%),
+    radial-gradient(900px 620px at 55% 108%, rgba(16,185,129,.14), transparent 62%),
+    rgb(var(--bg));
+  background-attachment: fixed;
+}
 body { overflow-x: hidden; font-feature-settings: "tnum" 1, "cv11" 1; }
 .tabular-nums, .font-mono { font-variant-numeric: tabular-nums; }
-::selection { background: rgba(47, 120, 238, .22); }
-* { scrollbar-width: thin; scrollbar-color: #CDD3DD transparent; }
-input[type="range"] { accent-color: #2F78EE; }
+::selection { background: rgba(37, 99, 255, .22); }
+* { scrollbar-width: thin; scrollbar-color: #C3CCEA transparent; }
+input[type="range"] { accent-color: #2563FF; }
 /* text fields show focus by a lighter fill, not a border or outline */
-:focus-visible { outline: 2px solid #2F78EE; outline-offset: 2px; }
+:focus-visible { outline: 2px solid #2563FF; outline-offset: 2px; }
 input:not([type="range"]):not([type="checkbox"]):not([type="file"]):focus-visible, select:focus-visible { outline: none; }
 
 /* shared press / hover feel for every clickable control */

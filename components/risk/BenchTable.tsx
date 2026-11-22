@@ -25,8 +25,8 @@ export function BenchmarkComparison({ a }: { a: AnalysisResult }) {
     { metric: "intCover", label: "Interest coverage", value: cover, higherIsWorse: false },
   ];
   return (
-    <Card className="xl:col-span-7" hover={false}>
-      <CardHead title="Industry benchmark comparison" hint={ctx.selected ? `Selected industry: ${ctx.name}${ctx.subName ? ` · ${ctx.subName}` : ""}. Benchmark period: ${SOURCE.year}, updated ${SOURCE.updated}. The median is not a target.` : "Select an industry (Investment Risk or Company Analysis) to compare the company with its industry."} right={ctx.selected ? <Pill tone="accent">{ctx.name}</Pill> : <Pill tone="warn">No industry</Pill>} />
+    <Card tint="violet" className="xl:col-span-7" hover={false}>
+      <CardHead title="Industry benchmark comparison" hint={ctx.selected ? `Selected industry: ${ctx.name}${ctx.subName ? ` · ${ctx.subName}` : ""}. Benchmark period: ${SOURCE.year}, updated ${SOURCE.updated}. The median is not a target.` : "Select an industry under Data & upload to compare the company with its industry."} right={ctx.selected ? <Pill tone="accent">{ctx.name}</Pill> : <Pill tone="warn">No industry</Pill>} />
       <div className="-mx-5 overflow-x-auto px-5">
         <table className="w-full min-w-[560px] border-collapse text-[12.5px]">
           <thead><tr className="border-b border-line font-mono text-[10px] uppercase tracking-wider text-ink3">{["Metric", "Company", "Industry median", "Typical range", "Position"].map((h, i) => <th key={h} className={clsx("py-2.5 font-medium", i === 0 ? "text-left" : "px-2 text-right")}>{h}</th>)}</tr></thead>
@@ -61,7 +61,7 @@ export function CashConversionChart({ a }: { a: AnalysisResult }) {
   const data = a.records.map((r, i) => { const e = adjustedEbitda(r, a.inputs, i === a.records.length - 1); return { year: `FY${String(r.year).slice(2)}`, v: e != null && e > 0 && r.operatingCashFlow != null ? (r.operatingCashFlow / e) * 100 : null }; });
   const [lo, mid] = [cuts.ocf[0], cuts.ocf[1]];
   return (
-    <Card className="xl:col-span-5">
+    <Card tint="mint" className="xl:col-span-5">
       <CardHead title="Cash conversion analysis" hint={`Operating cash flow ÷ adjusted EBITDA. Lines are the proposed screening cut-offs (${lo}% Low, ${mid}% Moderate), not industry averages.`} />
       <div className="h-[250px]">
         <ResponsiveContainer>
@@ -70,8 +70,8 @@ export function CashConversionChart({ a }: { a: AnalysisResult }) {
             <XAxis dataKey="year" stroke="var(--c-axis)" fontSize={11} tickLine={false} axisLine={false} />
             <YAxis stroke="var(--c-axis)" fontSize={11} tickLine={false} axisLine={false} unit="%" domain={[0, (m: number) => Math.max(100, Math.ceil(m / 10) * 10)]} />
             <Tooltip {...chartTooltip} cursor={{ fill: "var(--c-cursor)" }} formatter={(v: number) => [`${v.toFixed(0)}%`, "Cash conversion"]} />
-            <ReferenceLine y={lo} stroke="#35C994" strokeDasharray="4 4" /><ReferenceLine y={mid} stroke="#F5A640" strokeDasharray="4 4" />
-            <RBar dataKey="v" radius={[4, 4, 0, 0]} maxBarSize={44} animationDuration={600}>{data.map((d, i) => <Cell key={i} fill={d.v == null ? "var(--c-muted)" : d.v >= lo ? "#35C994" : d.v >= mid ? "#F5A640" : "#F06464"} />)}</RBar>
+            <ReferenceLine y={lo} stroke="#10B981" strokeDasharray="4 4" /><ReferenceLine y={mid} stroke="#F59E0B" strokeDasharray="4 4" />
+            <RBar dataKey="v" radius={[4, 4, 0, 0]} maxBarSize={44} animationDuration={600}>{data.map((d, i) => <Cell key={i} fill={d.v == null ? "var(--c-muted)" : d.v >= lo ? "#10B981" : d.v >= mid ? "#F59E0B" : "#F43F5E"} />)}</RBar>
           </BarChart>
         </ResponsiveContainer>
       </div>

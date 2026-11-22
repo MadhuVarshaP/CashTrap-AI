@@ -4,7 +4,7 @@ import { motion } from "framer-motion";
 import type { RiskResult } from "@/types/finance";
 import { CountNum } from "@/components/shared/ui";
 
-export const riskColor = (score: number | null) => (score == null ? "var(--c-axis)" : score < 25 ? "#35C994" : score < 50 ? "#F5A640" : "#F06464");
+export const riskColor = (score: number | null) => (score == null ? "var(--c-axis)" : score < 25 ? "#10B981" : score < 50 ? "#F59E0B" : "#F43F5E");
 
 /** 270° arc gauge with threshold ticks at 25 / 50 / 75. */
 export function RiskGauge({ risk, size = 220 }: { risk: RiskResult; size?: number }) {

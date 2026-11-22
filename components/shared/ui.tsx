@@ -10,15 +10,24 @@ import type { Severity } from "@/types/finance";
 import { useCountUp } from "@/lib/utilities/useCountUp";
 
 export const SEV: Record<Severity, { text: string; bg: string; bar: string; hex: string }> = {
-  Low: { text: "text-pos", bg: "bg-pos/10 border-pos/25", bar: "bg-pos", hex: "#35C994" },
-  Medium: { text: "text-warn", bg: "bg-warn/10 border-warn/25", bar: "bg-warn", hex: "#F5A640" },
-  High: { text: "text-crit", bg: "bg-crit/10 border-crit/25", bar: "bg-crit", hex: "#F06464" },
-  Critical: { text: "text-crit", bg: "bg-crit/15 border-crit/40", bar: "bg-crit", hex: "#F06464" },
+  Low: { text: "text-pos", bg: "bg-pos/10 border-pos/25", bar: "bg-pos", hex: "#10B981" },
+  Medium: { text: "text-warn", bg: "bg-warn/10 border-warn/25", bar: "bg-warn", hex: "#F59E0B" },
+  High: { text: "text-crit", bg: "bg-crit/10 border-crit/25", bar: "bg-crit", hex: "#F43F5E" },
+  Critical: { text: "text-crit", bg: "bg-crit/15 border-crit/40", bar: "bg-crit", hex: "#F43F5E" },
 };
 
-export function Card({ className, children, hover = true, id }: { className?: string; children: ReactNode; hover?: boolean; id?: string }) {
+export type Tint = "blue" | "violet" | "mint" | "amber" | "rose";
+export const TINT: Record<Tint, string> = {
+  blue: "bg-gradient-to-br from-[#E8F0FF] via-white to-white",
+  violet: "bg-gradient-to-br from-[#F1EBFF] via-white to-white",
+  mint: "bg-gradient-to-br from-[#E4FAF1] via-white to-white",
+  amber: "bg-gradient-to-br from-[#FFF3DD] via-white to-white",
+  rose: "bg-gradient-to-br from-[#FFE9EF] via-white to-white",
+};
+
+export function Card({ className, children, hover = true, id, tint }: { className?: string; children: ReactNode; hover?: boolean; id?: string; tint?: Tint }) {
   return (
-    <div id={id} className={clsx("rounded-card border border-line bg-card p-5 shadow-card sm:p-6", hover && "transition-[border-color,box-shadow,transform] duration-200 hover:-translate-y-0.5 hover:border-line2 hover:shadow-lift", className)}>
+    <div id={id} className={clsx("rounded-card border border-line bg-card p-5 shadow-card sm:p-6", tint && TINT[tint], hover && "transition-[border-color,box-shadow,transform] duration-200 hover:-translate-y-0.5 hover:border-line2 hover:shadow-lift", className)}>
       {children}
     </div>
   );
@@ -28,6 +37,7 @@ export function CardHead({ title, hint, right, icon }: { title: string; hint?: s
   return (
     <div className="mb-4 flex items-start justify-between gap-3">
       <div className="flex min-w-0 items-center gap-2">
+        <span aria-hidden className="h-4 w-1 shrink-0 rounded-full bg-gradient-to-b from-accent to-ai" />
         {icon}
         <h3 className="font-display text-[15px] font-medium text-ink">{title}</h3>
         {hint && <Term tip={hint} />}
@@ -64,7 +74,7 @@ export function Pill({ children, tone = "neutral", className }: { children: Reac
 
 export function Button({ variant = "primary", className, ...p }: React.ButtonHTMLAttributes<HTMLButtonElement> & { variant?: "primary" | "ghost" | "ai" }) {
   const v = {
-    primary: "bg-gradient-to-b from-[#4d97ff] to-[#3282ea] text-white shadow-[inset_0_1px_0_rgba(255,255,255,.22),0_6px_18px_-8px_rgba(57,136,245,.9)] hover:from-[#5aa1ff] hover:to-[#3a8cf5] hover:shadow-[inset_0_1px_0_rgba(255,255,255,.28),0_10px_24px_-8px_rgba(57,136,245,1)] disabled:bg-none disabled:bg-elev disabled:text-ink3 disabled:shadow-none",
+    primary: "bg-gradient-to-r from-[#2F6BFF] to-[#7A5CFF] text-white shadow-[inset_0_1px_0_rgba(255,255,255,.25),0_8px_20px_-8px_rgba(80,80,255,.7)] hover:from-[#4A7FFF] hover:to-[#8D6FFF] hover:shadow-[inset_0_1px_0_rgba(255,255,255,.3),0_12px_26px_-8px_rgba(90,80,255,.85)] disabled:bg-none disabled:bg-elev disabled:text-ink3 disabled:shadow-none",
     ghost: "border border-line bg-elev/70 text-ink hover:border-accent/50 hover:bg-elev hover:shadow-[0_8px_20px_-12px_rgba(57,136,245,.6)] disabled:text-ink3",
     ai: "border border-ai/40 bg-ai/10 text-ai hover:border-ai/70 hover:bg-ai/20 hover:shadow-[0_8px_22px_-10px_rgba(167,139,250,.8)]",
   }[variant];
@@ -75,7 +85,7 @@ export function PageTitle({ title, sub, right }: { title: string; sub: string; r
   return (
     <div className="mb-7 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
       <div>
-        <h1 className="font-display text-[26px] font-semibold leading-tight tracking-tight text-ink sm:text-[32px]">{title}</h1>
+        <h1 className="bg-gradient-to-r from-ink via-[#2447E8] to-ai bg-clip-text font-display text-[26px] font-semibold leading-tight tracking-tight text-transparent sm:text-[32px]">{title}</h1>
         <p className="mt-1.5 max-w-2xl text-[14px] text-ink2">{sub}</p>
       </div>
       {right}

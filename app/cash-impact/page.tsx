@@ -14,8 +14,8 @@ import { fmtM, fmtNum, cur } from "@/lib/utilities/format";
 /** starting-point targets (days off DSO and DIO). DPO is left alone: stretching suppliers is a choice with its own risk. */
 const SCEN = [
   { id: "cons", name: "Conservative", dso: 8, dio: 5, color: "var(--c-tick)", note: "Tighter follow-up on overdue accounts and stock" },
-  { id: "base", name: "Base", dso: 15, dio: 10, color: "#3988F5", note: "Revised credit terms, collections and purchasing discipline" },
-  { id: "opt", name: "Optimistic", dso: 25, dio: 15, color: "#35C994", note: "Full return toward prior-year days" },
+  { id: "base", name: "Base", dso: 15, dio: 10, color: "#3B6CFF", note: "Revised credit terms, collections and purchasing discipline" },
+  { id: "opt", name: "Optimistic", dso: 25, dio: 15, color: "#10B981", note: "Full return toward prior-year days" },
 ];
 
 type Fields = Record<"sales" | "cogs" | "purch" | "dso" | "tDso" | "dio" | "tDio" | "dpo" | "tDpo" | "cash" | "minCash", string>;
@@ -117,7 +117,7 @@ export default function CashImpact() {
     { name: "Receivables (DSO)", value: rec, kind: (rec == null ? "missing" : "delta") as "missing" | "delta" },
     { name: "Inventory (DIO)", value: inv, kind: (inv == null ? "missing" : "delta") as "missing" | "delta" },
     { name: "Payables (DPO)", value: pay, kind: (pay == null ? "missing" : "delta") as "missing" | "delta" },
-    { name: "Total release", value: total, kind: "total" as const, color: total >= 0 ? "#3988F5" : "#F06464" },
+    { name: "Total release", value: total, kind: "total" as const, color: total >= 0 ? "#3B6CFF" : "#F43F5E" },
   ]), [rec, inv, pay, total]);
 
   const cmp = allDays || (rec != null || inv != null || pay != null)
@@ -125,9 +125,9 @@ export default function CashImpact() {
     : [];
 
   const comps = [
-    { id: "rec", title: "Receivables · DSO", val: rec, color: "#3988F5", formula: `(${fmtNum(v("sales"))} ÷ 365) × (${fmtNum(v("dso"))} − ${fmtNum(tDso)})`, need: "annual credit sales, current and target DSO", base: "credit sales", cur: v("dso"), tgt: tDso, unit: "DSO" },
-    { id: "inv", title: "Inventory · DIO", val: inv, color: "#F5A640", formula: `(${fmtNum(v("cogs"))} ÷ 365) × (${fmtNum(v("dio"))} − ${fmtNum(tDio)})`, need: "annual COGS, current and target DIO", base: "COGS", cur: v("dio"), tgt: tDio, unit: "DIO" },
-    { id: "pay", title: "Payables · DPO", val: pay, color: "#A78BFA", formula: `(${fmtNum(v("purch"))} ÷ 365) × (${fmtNum(tDpo)} − ${fmtNum(v("dpo"))})`, need: "annual purchases, current and target DPO", base: "purchases", cur: v("dpo"), tgt: tDpo, unit: "DPO" },
+    { id: "rec", title: "Receivables · DSO", val: rec, color: "#3B6CFF", formula: `(${fmtNum(v("sales"))} ÷ 365) × (${fmtNum(v("dso"))} − ${fmtNum(tDso)})`, need: "annual credit sales, current and target DSO", base: "credit sales", cur: v("dso"), tgt: tDso, unit: "DSO" },
+    { id: "inv", title: "Inventory · DIO", val: inv, color: "#F59E0B", formula: `(${fmtNum(v("cogs"))} ÷ 365) × (${fmtNum(v("dio"))} − ${fmtNum(tDio)})`, need: "annual COGS, current and target DIO", base: "COGS", cur: v("dio"), tgt: tDio, unit: "DIO" },
+    { id: "pay", title: "Payables · DPO", val: pay, color: "#8B5CF6", formula: `(${fmtNum(v("purch"))} ÷ 365) × (${fmtNum(tDpo)} − ${fmtNum(v("dpo"))})`, need: "annual purchases, current and target DPO", base: "purchases", cur: v("dpo"), tgt: tDpo, unit: "DPO" },
   ];
 
   return (
@@ -145,9 +145,9 @@ export default function CashImpact() {
               <NumField label="Annual purchases" value={f.purch} onChange={set("purch")} unit={`${cur()} m`} error={err("purch", "money")} hint={purchasesProxy ? "Assumption: purchases not in the file, so COGS is used as a proxy. Overwrite if you have the figure." : undefined} />
             </div>
             {([
-              ["Receivables", "dso", "tDso", "DSO", "#3988F5"],
-              ["Inventory", "dio", "tDio", "DIO", "#F5A640"],
-              ["Payables", "dpo", "tDpo", "DPO", "#A78BFA"],
+              ["Receivables", "dso", "tDso", "DSO", "#3B6CFF"],
+              ["Inventory", "dio", "tDio", "DIO", "#F59E0B"],
+              ["Payables", "dpo", "tDpo", "DPO", "#8B5CF6"],
             ] as const).map(([name, cur, tgtK, u, col]) => (
               <div key={cur} className="space-y-3">
                 <div className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-wider" style={{ color: col }}><span className="h-2 w-2 rounded-full" style={{ background: col }} />{name} · {u}</div>
@@ -169,8 +169,8 @@ export default function CashImpact() {
         </Card>
 
         <div className="space-y-5 xl:col-span-8">
-          <motion.div initial={{ opacity: 0.6 }} animate={{ opacity: 1 }} className="relative overflow-hidden rounded-card border border-line bg-card p-6 sm:p-8">
-            <div className="absolute inset-y-0 left-0 w-1" style={{ background: total != null && total < 0 ? "#F06464" : "#3988F5" }} />
+          <motion.div initial={{ opacity: 0.6 }} animate={{ opacity: 1 }} className="relative overflow-hidden rounded-card border border-line bg-gradient-to-br from-[#E4EDFF] via-white to-[#F1EBFF] p-6 shadow-card sm:p-8">
+            <div className="absolute inset-y-0 left-0 w-1" style={{ background: total != null && total < 0 ? "#F43F5E" : "#3B6CFF" }} />
             <div className="flex items-center justify-between"><span className="font-mono text-[11px] uppercase tracking-wider text-ink3">{total != null && total < 0 ? "Additional cash required" : "Total potential cash release"}</span><Pill tone="warn">Not guaranteed</Pill></div>
             <div className="mt-3 font-display text-[44px] font-semibold leading-none tracking-tight sm:text-[60px]">
               {total != null ? <Money value={Math.abs(total)} prefix={total < 0 ? `− ${cur()} ` : `${cur()} `} suffix="m" className={total < 0 ? "text-crit" : undefined} /> : <span className="text-ink3">—</span>}
@@ -231,7 +231,7 @@ export default function CashImpact() {
                     <Tooltip {...chartTooltip} cursor={{ fill: "var(--c-cursor)" }} formatter={(x: number, n: string) => [`${x.toFixed(1)} days`, n === "current" ? "Current" : "Target"]} />
                     <Legend wrapperStyle={{ fontSize: 11, color: "var(--c-tick)" }} formatter={(x) => (x === "current" ? "Current" : "Target")} />
                     <RBar dataKey="current" fill="var(--c-axis)" radius={[3, 3, 0, 0]} maxBarSize={26} animationDuration={500} />
-                    <RBar dataKey="target" fill="#3988F5" radius={[3, 3, 0, 0]} maxBarSize={26} animationDuration={500} />
+                    <RBar dataKey="target" fill="#3B6CFF" radius={[3, 3, 0, 0]} maxBarSize={26} animationDuration={500} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>

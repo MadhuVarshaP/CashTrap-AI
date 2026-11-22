@@ -14,7 +14,7 @@ const legend = { iconType: "circle" as const, iconSize: 7, wrapperStyle: { fontS
 /** compact axis labels for millions so very large companies stay readable */
 export const axisM = (v: number) => { const { n, unit } = scaleM(v, 0); return `${n}${unit}`; };
 const tipM = (v: number) => { const { n, unit } = scaleM(v, 1); return `${cur()} ${n}${unit}`; };
-const C = { ebitda: "#35C994", ocf: "#F5A640", fcf: "#3988F5", crit: "#F06464", ai: "#A78BFA", muted: "var(--c-axis)", stress: "#F06464" };
+const C = { ebitda: "#10B981", ocf: "#F59E0B", fcf: "#3B6CFF", crit: "#F43F5E", ai: "#8B5CF6", muted: "var(--c-axis)", stress: "#F43F5E" };
 
 export function EbitdaMarginChart({ a }: { a: AnalysisResult }) {
   const data = a.records.map((r, i) => ({ year: fy(r.year), ebitda: adjustedEbitda(r, a.inputs, i === a.records.length - 1), margin: r.ebitda != null && r.revenue ? (r.ebitda / r.revenue) * 100 : null }));
@@ -80,7 +80,7 @@ export function DebtChart({ a }: { a: AnalysisResult }) {
         <YAxis yAxisId="l" {...axis} width={48} tickFormatter={axisM} /><YAxis yAxisId="r" orientation="right" {...axis} width={40} unit="x" />
         <Tooltip {...chartTooltip} formatter={(v: number, n: string) => (n === "lev" ? [`${v.toFixed(2)}x`, "Net debt / EBITDA"] : [tipM(v), n === "debt" ? "Total debt" : "Cash"])} />
         <Legend {...legend} formatter={(v) => (v === "lev" ? "Net debt / EBITDA" : v === "debt" ? "Total debt" : "Cash")} />
-        <ReferenceLine yAxisId="r" y={3} stroke="#F5A640" strokeDasharray="4 4" /><ReferenceLine yAxisId="r" y={4} stroke="#F06464" strokeDasharray="4 4" />
+        <ReferenceLine yAxisId="r" y={3} stroke="#F59E0B" strokeDasharray="4 4" /><ReferenceLine yAxisId="r" y={4} stroke="#F43F5E" strokeDasharray="4 4" />
         <Bar yAxisId="l" dataKey="debt" fill={C.crit} fillOpacity={0.75} radius={[3, 3, 0, 0]} maxBarSize={22} animationDuration={600} />
         <Bar yAxisId="l" dataKey="cash" fill={C.ebitda} fillOpacity={0.85} radius={[3, 3, 0, 0]} maxBarSize={22} animationDuration={600} />
         <Line yAxisId="r" dataKey="lev" stroke={C.ai} strokeWidth={2.2} dot={{ r: 3.5, fill: "var(--c-card)", strokeWidth: 2 }} animationDuration={700} />
@@ -97,7 +97,7 @@ export function StressChart({ rows }: { rows: { name: string; base: number | nul
         <Tooltip {...chartTooltip} cursor={{ fill: "var(--c-cursor)" }} formatter={(v: number, n: string) => [tipM(v), n === "base" ? "Base case" : "Stressed (illustrative)"]} />
         <Legend {...legend} formatter={(v) => (v === "base" ? "Base case" : "Stressed (illustrative)")} />
         <ReferenceLine y={0} stroke="var(--c-muted)" />
-        <Bar dataKey="base" fill="#3988F5" radius={[3, 3, 0, 0]} maxBarSize={34} animationDuration={600} />
+        <Bar dataKey="base" fill="#3B6CFF" radius={[3, 3, 0, 0]} maxBarSize={34} animationDuration={600} />
         <Bar dataKey="stressed" fill={C.stress} fillOpacity={0.85} radius={[3, 3, 0, 0]} maxBarSize={34} animationDuration={600} />
       </BarChart>
     </ResponsiveContainer>

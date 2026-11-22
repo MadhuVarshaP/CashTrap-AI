@@ -62,7 +62,7 @@ export function BridgeByYear({ years, selected, onSelect }: { years: BridgeYear[
                 {/* conversion ring */}
                 <svg width="62" height="62" viewBox="0 0 62 62" aria-label={`Cash conversion ${fmtPct(y.conversion, 0)}`}>
                   <circle cx="31" cy="31" r="25" fill="none" stroke="var(--c-elev)" strokeWidth="7" />
-                  {conv != null && <motion.circle cx="31" cy="31" r="25" fill="none" stroke={conv >= 0.8 ? "#35C994" : conv >= 0.5 ? "#F5A640" : "#F06464"} strokeWidth="7" strokeLinecap="round" strokeDasharray={2 * Math.PI * 25} initial={{ strokeDashoffset: 2 * Math.PI * 25 }} animate={{ strokeDashoffset: 2 * Math.PI * 25 * (1 - conv) }} transition={{ duration: 0.9, ease: "easeOut" }} transform="rotate(-90 31 31)" />}
+                  {conv != null && <motion.circle cx="31" cy="31" r="25" fill="none" stroke={conv >= 0.8 ? "#10B981" : conv >= 0.5 ? "#F59E0B" : "#F43F5E"} strokeWidth="7" strokeLinecap="round" strokeDasharray={2 * Math.PI * 25} initial={{ strokeDashoffset: 2 * Math.PI * 25 }} animate={{ strokeDashoffset: 2 * Math.PI * 25 * (1 - conv) }} transition={{ duration: 0.9, ease: "easeOut" }} transform="rotate(-90 31 31)" />}
                   <text x="31" y="35" textAnchor="middle" fontSize="12" fontWeight="600" fill="var(--c-ink)">{y.conversion == null ? "—" : `${Math.round(y.conversion * 100)}%`}</text>
                 </svg>
               </div>
