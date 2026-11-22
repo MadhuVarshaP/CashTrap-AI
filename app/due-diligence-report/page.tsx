@@ -124,7 +124,7 @@ function Page({ a }: { a: AnalysisResult }) {
                 </div>
                 <div className="space-y-3">
                   {secs.map((s, i) => (
-                    <section key={s.id} id={`sec-${s.id}`} className={clsx("scroll-mt-24 overflow-hidden rounded-card border bg-card", open.has(s.id) ? "border-[#3f4551]" : "border-line")}>
+                    <section key={s.id} id={`sec-${s.id}`} className={clsx("scroll-mt-24 overflow-hidden rounded-card border bg-card", open.has(s.id) ? "border-line2" : "border-line")}>
                       <button onClick={() => toggle(s.id)} aria-expanded={open.has(s.id)} className="flex w-full items-center gap-4 p-5 text-left">
                         <span className="font-mono text-[12px] text-ink3">{String(i + 1).padStart(2, "0")}</span>
                         <span className="min-w-0 flex-1"><span className="block font-display text-[16px] font-medium">{s.title}</span><span className="mt-0.5 block text-[12.5px] text-ink3">{s.question}</span></span>

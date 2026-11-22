@@ -10,7 +10,7 @@ import { useApp } from "@/lib/state/store";
 export const CURRENCIES = ["AED", "USD", "EUR", "GBP", "SAR", "QAR", "KWD", "OMR", "BHD", "EGP", "INR", "JPY", "CNY", "CHF", "Other"];
 export const FREQUENCIES = ["Annual", "Half-yearly", "Quarterly", "Monthly"];
 
-const sel = "h-12 w-full rounded-xl bg-bg2 px-3 text-[14px] text-ink outline-none transition-colors hover:bg-[#1d2026] focus:bg-elev";
+const sel = "h-12 w-full rounded-xl bg-bg2 px-3 text-[14px] text-ink outline-none transition-colors hover:bg-elev focus:bg-elev";
 const Field = ({ label, children, hint }: { label: string; children: React.ReactNode; hint?: string }) => (
   <label className="block">
     <span className="mb-1.5 block font-mono text-[10.5px] uppercase tracking-wider text-ink3">{label}</span>

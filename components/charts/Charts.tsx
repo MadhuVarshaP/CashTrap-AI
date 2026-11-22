@@ -5,10 +5,10 @@ import { Area, Bar, BarChart, CartesianGrid, Cell, ComposedChart, Legend, Line, 
 import type { AnalysisResult } from "@/types/finance";
 import { chartTooltip } from "@/components/shared/ui";
 
-const axis = { stroke: "#707681", fontSize: 11, tickLine: false, axisLine: false } as const;
-const grid = <CartesianGrid stroke="#23262d" vertical={false} />;
+const axis = { stroke: "var(--c-axis)", fontSize: 11, tickLine: false, axisLine: false } as const;
+const grid = <CartesianGrid stroke="var(--c-grid)" vertical={false} />;
 const fy = (y: number) => `FY${String(y).slice(2)}`;
-export const COLORS = { revenue: "#3988F5", ebitda: "#35C994", ocf: "#F5A640", ai: "#A78BFA", crit: "#F06464", muted: "#707681" };
+export const COLORS = { revenue: "#3988F5", ebitda: "#35C994", ocf: "#F5A640", ai: "#A78BFA", crit: "#F06464", muted: "var(--c-axis)" };
 
 export type Series = "revenue" | "ebitda" | "ocf";
 const label: Record<Series, string> = { revenue: "Revenue", ebitda: "EBITDA", ocf: "Operating cash flow" };
@@ -29,8 +29,8 @@ export function TrendChart({ a, series, mode, from }: { a: AnalysisResult; serie
         <XAxis dataKey="year" {...axis} />
         <YAxis {...axis} width={44} tickFormatter={(v) => (mode === "indexed" ? `${v}` : `${v}`)} domain={mode === "indexed" ? ["auto", "auto"] : [0, "auto"]} />
         <Tooltip {...chartTooltip} formatter={(v: number, n: string) => [mode === "indexed" ? `${v.toFixed(0)} (base 100)` : `${cur()} ${v.toFixed(1)}m`, label[n as Series]]} />
-        <Legend iconType="circle" iconSize={7} wrapperStyle={{ fontSize: 11, color: "#A2A7B0", paddingTop: 8 }} formatter={(v) => label[v as Series]} />
-        {series.map((s) => <Line key={s} type="monotone" dataKey={s} stroke={COLORS[s]} strokeWidth={2.2} dot={{ r: 3.5, fill: "#17191E", strokeWidth: 2 }} activeDot={{ r: 5 }} animationDuration={700} />)}
+        <Legend iconType="circle" iconSize={7} wrapperStyle={{ fontSize: 11, color: "var(--c-tick)", paddingTop: 8 }} formatter={(v) => label[v as Series]} />
+        {series.map((s) => <Line key={s} type="monotone" dataKey={s} stroke={COLORS[s]} strokeWidth={2.2} dot={{ r: 3.5, fill: "var(--c-card)", strokeWidth: 2 }} activeDot={{ r: 5 }} animationDuration={700} />)}
       </ComposedChart>
     </ResponsiveContainer>
   );
@@ -49,8 +49,8 @@ export function WorkingCapitalChart({ a, show }: { a: AnalysisResult; show: WC[]
         <XAxis dataKey="year" {...axis} />
         <YAxis {...axis} width={50} unit="d" />
         <Tooltip {...chartTooltip} formatter={(v: number, n: string) => [`${v.toFixed(1)} days`, WC_LABEL[n as WC]]} />
-        <Legend iconType="circle" iconSize={7} wrapperStyle={{ fontSize: 11, color: "#A2A7B0", paddingTop: 8 }} formatter={(v) => WC_LABEL[v as WC]} />
-        {show.map((k) => <Line key={k} type="monotone" dataKey={k} stroke={wcColor[k]} strokeWidth={k === "ccc" ? 2.8 : 2} strokeDasharray={k === "ccc" ? undefined : "0"} dot={{ r: 3.5, fill: "#17191E", strokeWidth: 2 }} connectNulls={false} animationDuration={700} />)}
+        <Legend iconType="circle" iconSize={7} wrapperStyle={{ fontSize: 11, color: "var(--c-tick)", paddingTop: 8 }} formatter={(v) => WC_LABEL[v as WC]} />
+        {show.map((k) => <Line key={k} type="monotone" dataKey={k} stroke={wcColor[k]} strokeWidth={k === "ccc" ? 2.8 : 2} strokeDasharray={k === "ccc" ? undefined : "0"} dot={{ r: 3.5, fill: "var(--c-card)", strokeWidth: 2 }} connectNulls={false} animationDuration={700} />)}
       </LineChart>
     </ResponsiveContainer>
   );
@@ -67,8 +67,8 @@ export function DivergenceChart({ a }: { a: AnalysisResult }) {
         <YAxis {...axis} width={44} />
         <Tooltip {...chartTooltip} formatter={(v: number | number[], n: string) => (n === "gap" ? [`${cur()} ${(((v as number[])[1] - (v as number[])[0])).toFixed(1)}m`, "Cash gap"] : [`${cur()} ${(v as number).toFixed(1)}m`, n === "ebitda" ? "EBITDA" : "Operating cash flow"])} />
         <Area type="monotone" dataKey="gap" stroke="none" fill="#F06464" fillOpacity={0.16} animationDuration={700} />
-        <Line type="monotone" dataKey="ebitda" stroke={COLORS.ebitda} strokeWidth={2.2} dot={{ r: 3.5, fill: "#17191E", strokeWidth: 2 }} animationDuration={700} />
-        <Line type="monotone" dataKey="ocf" stroke={COLORS.ocf} strokeWidth={2.2} dot={{ r: 3.5, fill: "#17191E", strokeWidth: 2 }} animationDuration={700} />
+        <Line type="monotone" dataKey="ebitda" stroke={COLORS.ebitda} strokeWidth={2.2} dot={{ r: 3.5, fill: "var(--c-card)", strokeWidth: 2 }} animationDuration={700} />
+        <Line type="monotone" dataKey="ocf" stroke={COLORS.ocf} strokeWidth={2.2} dot={{ r: 3.5, fill: "var(--c-card)", strokeWidth: 2 }} animationDuration={700} />
       </ComposedChart>
     </ResponsiveContainer>
   );
@@ -86,9 +86,9 @@ export function GrowthIndexChart({ a }: { a: AnalysisResult }) {
         {grid}
         <XAxis dataKey="year" {...axis} />
         <YAxis {...axis} width={44} domain={[80, "auto"]} />
-        <ReferenceLine y={100} stroke="#3a3f49" strokeDasharray="3 3" />
+        <ReferenceLine y={100} stroke="var(--c-muted)" strokeDasharray="3 3" />
         <Tooltip {...chartTooltip} formatter={(v: number, k: string) => [`${v.toFixed(0)} (base 100)`, n[k]]} />
-        <Legend iconType="circle" iconSize={7} wrapperStyle={{ fontSize: 11, color: "#A2A7B0", paddingTop: 8 }} formatter={(v) => n[v]} />
+        <Legend iconType="circle" iconSize={7} wrapperStyle={{ fontSize: 11, color: "var(--c-tick)", paddingTop: 8 }} formatter={(v) => n[v]} />
         <Line type="monotone" dataKey="revenue" stroke={COLORS.revenue} strokeWidth={2.2} dot={{ r: 3 }} animationDuration={700} />
         <Line type="monotone" dataKey="receivables" stroke={COLORS.crit} strokeWidth={2.2} dot={{ r: 3 }} animationDuration={700} />
         <Line type="monotone" dataKey="inventory" stroke={COLORS.ai} strokeWidth={2.2} dot={{ r: 3 }} animationDuration={700} />
@@ -120,9 +120,9 @@ export function CashBridge({ a }: { a: AnalysisResult }) {
     <ResponsiveContainer width="100%" height="100%">
       <BarChart data={data} margin={{ top: 8, right: 8, left: -12, bottom: 0 }}>
         {grid}
-        <XAxis dataKey="name" {...axis} interval={0} tick={{ fontSize: 10, fill: "#707681" }} />
+        <XAxis dataKey="name" {...axis} interval={0} tick={{ fontSize: 10, fill: "var(--c-axis)" }} />
         <YAxis {...axis} width={44} />
-        <Tooltip {...chartTooltip} cursor={{ fill: "#ffffff08" }} formatter={(_v, _n, p) => { const v = (p.payload as { v: number }).v; return [`${v >= 0 ? "+" : "−"}${cur()} ${Math.abs(v).toFixed(1)}m`, ""]; }} separator="" />
+        <Tooltip {...chartTooltip} cursor={{ fill: "var(--c-cursor)" }} formatter={(_v, _n, p) => { const v = (p.payload as { v: number }).v; return [`${v >= 0 ? "+" : "−"}${cur()} ${Math.abs(v).toFixed(1)}m`, ""]; }} separator="" />
         <Bar dataKey="base" stackId="w" fill="transparent" isAnimationActive={false} />
         <Bar dataKey="up" stackId="w" animationDuration={700}>{data.map((d, i) => <Cell key={i} fill={d.total ? "#3988F5" : "#35C994"} />)}</Bar>
         <Bar dataKey="down" stackId="w" fill="#F06464" radius={[4, 4, 0, 0]} animationDuration={700} />

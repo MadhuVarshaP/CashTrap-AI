@@ -99,7 +99,7 @@ function Dashboard({ a }: { a: AnalysisResult }) {
           {concerns.length === 0 ? <p className="text-[13px] text-ink2">No indicator scored risk points on the data supplied.</p> : (
             <div className="grid gap-3 lg:grid-cols-3">
               {concerns.map((f, n) => (
-                <Link key={f.id} href="/investment-assessment" className="tap block rounded-xl border border-line bg-bg2 p-4 hover:border-[#3f4551]">
+                <Link key={f.id} href="/investment-assessment" className="tap block rounded-xl border border-line bg-bg2 p-4 hover:border-line2">
                   <div className="mb-2 flex items-center justify-between gap-2"><span className="font-display text-[22px] font-semibold leading-none text-ink3">0{n + 1}</span><LevelBadge level={f.level} /></div>
                   <div className="text-[13.5px] font-medium leading-snug">{f.title}</div>
                   <p className="mt-1.5 line-clamp-2 font-mono text-[11px] leading-relaxed text-ink2">{f.evidence}</p>

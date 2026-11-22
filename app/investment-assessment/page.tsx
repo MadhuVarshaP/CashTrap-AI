@@ -59,7 +59,7 @@ function Page({ a }: { a: AnalysisResult }) {
       <IndustryProfile />
       <div role="tablist" aria-label="Investment risk sections" className="-mx-4 mb-6 flex gap-1.5 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0">
         {TABS.map((t) => (
-          <button key={t.id} role="tab" aria-selected={tab === t.id} onClick={() => setTab(t.id)} className={clsx("tap shrink-0 rounded-xl border px-4 py-2.5 text-[13px]", tab === t.id ? "border-accent/50 bg-accent/10 text-ink" : "border-line bg-card text-ink2 hover:border-[#3f4551] hover:text-ink")}>{t.label}</button>
+          <button key={t.id} role="tab" aria-selected={tab === t.id} onClick={() => setTab(t.id)} className={clsx("tap shrink-0 rounded-xl border px-4 py-2.5 text-[13px]", tab === t.id ? "border-accent/50 bg-accent/10 text-ink" : "border-line bg-card text-ink2 hover:border-line2 hover:text-ink")}>{t.label}</button>
         ))}
       </div>
       <motion.div key={tab} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25 }}>
@@ -132,10 +132,10 @@ function Dashboard({ a, go }: { a: AnalysisResult; go: (t: Tab) => void }) {
             return (
               <button key={p.id} onClick={() => go(p.id as Tab)} className="block w-full rounded-xl p-1 text-left transition-colors hover:bg-bg2">
                 <div className="mb-1.5 flex items-center justify-between gap-3 text-[13px]">
-                  <span className="flex min-w-0 items-center gap-2"><span className="h-2 w-2 shrink-0 rounded-sm" style={{ background: p.points == null ? "#3a3f49" : LEVEL_HEX[p.severity] }} /><span className="truncate">{p.name}</span><span className="hidden font-mono text-[10.5px] text-ink3 sm:inline">{p.weight} pts weight</span></span>
+                  <span className="flex min-w-0 items-center gap-2"><span className="h-2 w-2 shrink-0 rounded-sm" style={{ background: p.points == null ? "var(--c-muted)" : LEVEL_HEX[p.severity] }} /><span className="truncate">{p.name}</span><span className="hidden font-mono text-[10.5px] text-ink3 sm:inline">{p.weight} pts weight</span></span>
                   <span className="shrink-0 font-mono text-[12px] tabular-nums">{p.points == null ? <span className="text-ink3">NOT ASSESSED</span> : <>{p.points}<span className="text-ink3">/{p.max}</span></>}</span>
                 </div>
-                <Bar value={p.points ?? 0} max={p.max || 1} color={p.points == null ? "#3a3f49" : LEVEL_HEX[p.severity]} className="h-2.5" />
+                <Bar value={p.points ?? 0} max={p.max || 1} color={p.points == null ? "var(--c-muted)" : LEVEL_HEX[p.severity]} className="h-2.5" />
                 <div className="mt-1 font-mono text-[10.5px] text-ink3">{n} of {p.indicators.length} indicators assessed</div>
               </button>
             );
@@ -152,7 +152,7 @@ function Dashboard({ a, go }: { a: AnalysisResult; go: (t: Tab) => void }) {
               <div className="mb-1.5 font-mono text-[10px] uppercase tracking-wider text-ink3">{p.name}</div>
               <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4">
                 {p.indicators.map((i) => (
-                  <button key={i.id} onClick={() => go(p.id as Tab)} title={`${i.name}: ${levelName(i.level)}${i.points != null ? ` (${i.points}/${i.max})` : ""}`} className="min-h-[52px] rounded-lg border px-2.5 py-2 text-left" style={i.level ? { background: LEVEL_HEX[i.level] + "22", borderColor: LEVEL_HEX[i.level] + "66" } : { background: "repeating-linear-gradient(135deg,#1d2026 0 5px,#17191E 5px 10px)", borderColor: i.applicable ? "#292D35" : "#292D35", opacity: i.applicable ? 1 : 0.6 }}>
+                  <button key={i.id} onClick={() => go(p.id as Tab)} title={`${i.name}: ${levelName(i.level)}${i.points != null ? ` (${i.points}/${i.max})` : ""}`} className="min-h-[52px] rounded-lg border px-2.5 py-2 text-left" style={i.level ? { background: LEVEL_HEX[i.level] + "22", borderColor: LEVEL_HEX[i.level] + "66" } : { background: "repeating-linear-gradient(135deg,var(--c-elev) 0 5px,var(--c-card) 5px 10px)", borderColor: i.applicable ? "var(--c-line)" : "var(--c-line)", opacity: i.applicable ? 1 : 0.6 }}>
                     <span className="line-clamp-2 block text-[11px] leading-tight text-ink2">{i.name}</span>
                     <span className="mt-0.5 block font-mono text-[10px] text-ink3">{!i.applicable ? "N/A" : i.points == null ? "not assessed" : `${i.points}/${i.max}`}</span>
                   </button>

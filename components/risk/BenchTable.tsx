@@ -66,12 +66,12 @@ export function CashConversionChart({ a }: { a: AnalysisResult }) {
       <div className="h-[250px]">
         <ResponsiveContainer>
           <BarChart data={data} margin={{ top: 8, right: 8, left: -10, bottom: 0 }}>
-            <CartesianGrid stroke="#23262d" vertical={false} />
-            <XAxis dataKey="year" stroke="#707681" fontSize={11} tickLine={false} axisLine={false} />
-            <YAxis stroke="#707681" fontSize={11} tickLine={false} axisLine={false} unit="%" domain={[0, (m: number) => Math.max(100, Math.ceil(m / 10) * 10)]} />
-            <Tooltip {...chartTooltip} cursor={{ fill: "#ffffff08" }} formatter={(v: number) => [`${v.toFixed(0)}%`, "Cash conversion"]} />
+            <CartesianGrid stroke="var(--c-grid)" vertical={false} />
+            <XAxis dataKey="year" stroke="var(--c-axis)" fontSize={11} tickLine={false} axisLine={false} />
+            <YAxis stroke="var(--c-axis)" fontSize={11} tickLine={false} axisLine={false} unit="%" domain={[0, (m: number) => Math.max(100, Math.ceil(m / 10) * 10)]} />
+            <Tooltip {...chartTooltip} cursor={{ fill: "var(--c-cursor)" }} formatter={(v: number) => [`${v.toFixed(0)}%`, "Cash conversion"]} />
             <ReferenceLine y={lo} stroke="#35C994" strokeDasharray="4 4" /><ReferenceLine y={mid} stroke="#F5A640" strokeDasharray="4 4" />
-            <RBar dataKey="v" radius={[4, 4, 0, 0]} maxBarSize={44} animationDuration={600}>{data.map((d, i) => <Cell key={i} fill={d.v == null ? "#3a3f49" : d.v >= lo ? "#35C994" : d.v >= mid ? "#F5A640" : "#F06464"} />)}</RBar>
+            <RBar dataKey="v" radius={[4, 4, 0, 0]} maxBarSize={44} animationDuration={600}>{data.map((d, i) => <Cell key={i} fill={d.v == null ? "var(--c-muted)" : d.v >= lo ? "#35C994" : d.v >= mid ? "#F5A640" : "#F06464"} />)}</RBar>
           </BarChart>
         </ResponsiveContainer>
       </div>

@@ -13,7 +13,7 @@ export interface Step {
   color?: string;
 }
 
-const POS = "#35C994", NEG = "#F06464", TOTAL = "#3988F5", MISS = "#3a3f49";
+const POS = "#35C994", NEG = "#F06464", TOTAL = "#3988F5", MISS = "var(--c-muted)";
 const axisM = (v: number) => { const { n, unit } = scaleM(v, 0); return `${n}${unit}`; };
 
 /** floating-bar waterfall; negative and zero-crossing movements are drawn as they are, never hidden */
@@ -29,16 +29,16 @@ export function Waterfall({ steps, height = 300, negLabel = "reduces cash" }: { 
     <div style={{ height }}>
       <ResponsiveContainer width="100%" height="100%">
         <BarChart data={data} margin={{ top: 22, right: 6, left: -6, bottom: 0 }}>
-          <CartesianGrid stroke="#23262d" vertical={false} />
-          <XAxis dataKey="name" stroke="#707681" fontSize={10.5} tickLine={false} axisLine={false} interval={0} />
-          <YAxis stroke="#707681" fontSize={11} tickLine={false} axisLine={false} width={46} tickFormatter={axisM} />
-          <ReferenceLine y={0} stroke="#3a3f49" />
-          <Tooltip {...chartTooltip} cursor={{ fill: "#ffffff08" }} formatter={(_v: unknown, _n: unknown, p: { payload?: { tip?: string } }) => [p.payload?.tip ?? "", ""]} separator="" />
+          <CartesianGrid stroke="var(--c-grid)" vertical={false} />
+          <XAxis dataKey="name" stroke="var(--c-axis)" fontSize={10.5} tickLine={false} axisLine={false} interval={0} />
+          <YAxis stroke="var(--c-axis)" fontSize={11} tickLine={false} axisLine={false} width={46} tickFormatter={axisM} />
+          <ReferenceLine y={0} stroke="var(--c-muted)" />
+          <Tooltip {...chartTooltip} cursor={{ fill: "var(--c-cursor)" }} formatter={(_v: unknown, _n: unknown, p: { payload?: { tip?: string } }) => [p.payload?.tip ?? "", ""]} separator="" />
           <Bar dataKey="range" radius={3} maxBarSize={54} animationDuration={600}
             label={({ x, y, width, index }: { x: number; y: number; width: number; index: number }) => (
-              <text x={x + width / 2} y={y - 6} textAnchor="middle" fontSize={10.5} fill="#A2A7B0" fontFamily="var(--font-mono, monospace)">{data[index]?.text}</text>
+              <text x={x + width / 2} y={y - 6} textAnchor="middle" fontSize={10.5} fill="var(--c-tick)" fontFamily="var(--font-mono, monospace)">{data[index]?.text}</text>
             )}>
-            {data.map((d, i) => <Cell key={i} fill={d.color} fillOpacity={d.missing ? 0.5 : 1} stroke={d.missing ? "#707681" : undefined} strokeDasharray={d.missing ? "3 3" : undefined} />)}
+            {data.map((d, i) => <Cell key={i} fill={d.color} fillOpacity={d.missing ? 0.5 : 1} stroke={d.missing ? "var(--c-axis)" : undefined} strokeDasharray={d.missing ? "3 3" : undefined} />)}
           </Bar>
         </BarChart>
       </ResponsiveContainer>

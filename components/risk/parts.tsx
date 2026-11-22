@@ -26,9 +26,9 @@ export function IndicatorCard({ i, defaultOpen = false }: { i: Indicator; defaul
   const [open, setOpen] = useState(defaultOpen);
   useAutoCollapse(open, () => setOpen(false));
   return (
-    <div className={clsx("overflow-hidden rounded-2xl border bg-card", open ? "border-[#3f4551]" : "border-line")}>
+    <div className={clsx("overflow-hidden rounded-2xl border bg-card", open ? "border-line2" : "border-line")}>
       <button onClick={() => setOpen(!open)} aria-expanded={open} className="flex w-full items-start gap-3 p-4 text-left sm:items-center sm:gap-4 sm:p-5">
-        <span className="mt-1 h-9 w-1 shrink-0 rounded-full sm:mt-0" style={{ background: i.level ? LEVEL_HEX[i.level] : "#3a3f49" }} />
+        <span className="mt-1 h-9 w-1 shrink-0 rounded-full sm:mt-0" style={{ background: i.level ? LEVEL_HEX[i.level] : "var(--c-muted)" }} />
         <span className="min-w-0 flex-1">
           <span className="flex flex-wrap items-center gap-2"><span className="font-display text-[14.5px] font-medium">{i.name}</span><LevelBadge level={i.level} na={!i.applicable} />{i.relevance === "core" && i.applicable && <span className="rounded-full border border-accent/30 bg-accent/10 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-accent">core here</span>}{i.relevance === "low" && i.applicable && <span className="rounded-full border border-line px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-ink3">low relevance</span>}</span>
           <span className="mt-1 block truncate font-mono text-[11.5px] text-ink3">{!i.applicable ? "Not Applicable to the selected industry" : i.points == null ? "Not Assessed: data missing" : i.actual}</span>

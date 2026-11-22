@@ -4,7 +4,7 @@ import { motion } from "framer-motion";
 import type { RiskResult } from "@/types/finance";
 import { CountNum } from "@/components/shared/ui";
 
-export const riskColor = (score: number | null) => (score == null ? "#707681" : score < 25 ? "#35C994" : score < 50 ? "#F5A640" : "#F06464");
+export const riskColor = (score: number | null) => (score == null ? "var(--c-axis)" : score < 25 ? "#35C994" : score < 50 ? "#F5A640" : "#F06464");
 
 /** 270° arc gauge with threshold ticks at 25 / 50 / 75. */
 export function RiskGauge({ risk, size = 220 }: { risk: RiskResult; size?: number }) {
@@ -20,11 +20,11 @@ export function RiskGauge({ risk, size = 220 }: { risk: RiskResult; size?: numbe
   return (
     <div className="relative mx-auto" style={{ width: size, height: size }}>
       <svg viewBox="0 0 200 200" className="h-full w-full" role="img" aria-label={`Risk score ${score ?? "insufficient data"} out of 100`}>
-        <circle cx="100" cy="100" r={r} fill="none" stroke="#22252c" strokeWidth="12" strokeLinecap="round" strokeDasharray={`${arc} ${c}`} transform="rotate(135 100 100)" />
+        <circle cx="100" cy="100" r={r} fill="none" stroke="var(--c-elev)" strokeWidth="12" strokeLinecap="round" strokeDasharray={`${arc} ${c}`} transform="rotate(135 100 100)" />
         {score != null && (
           <motion.circle cx="100" cy="100" r={r} fill="none" stroke={color} strokeWidth="12" strokeLinecap="round" transform="rotate(135 100 100)" strokeDasharray={`${arc} ${c}`} initial={{ strokeDashoffset: arc }} animate={{ strokeDashoffset: arc * (1 - score / 100) }} transition={{ duration: 1.3, ease: [0.22, 1, 0.36, 1] }} />
         )}
-        {[25, 50, 75].map((t) => <line key={t} {...tick(t)} stroke="#0A0B0D" strokeWidth="2.5" />)}
+        {[25, 50, 75].map((t) => <line key={t} {...tick(t)} stroke="var(--c-card)" strokeWidth="2.5" />)}
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
         {score == null ? (

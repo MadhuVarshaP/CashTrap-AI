@@ -58,7 +58,7 @@ export function Header() {
         <div className="flex items-center gap-2 sm:gap-3">
           
           <div ref={selRef} className="relative">
-            <button onClick={() => setSel(!sel)} className="flex h-10 items-center gap-2 rounded-xl border border-line bg-card px-3 text-[12.5px] hover:border-[#3f4551]" aria-haspopup="listbox" aria-expanded={sel}>
+            <button onClick={() => setSel(!sel)} className="flex h-10 items-center gap-2 rounded-xl border border-line bg-card px-3 text-[12.5px] hover:border-line2" aria-haspopup="listbox" aria-expanded={sel}>
               <Building2 size={15} className="text-ink3" />
               <span className={clsx("hidden max-w-[150px] truncate sm:inline", !hasCompany && "text-ink3")}>{hasCompany ? active.name : "No company"}</span>
               <ChevronDown size={14} className="text-ink3" />
@@ -94,12 +94,12 @@ export function Header() {
               )}
             </AnimatePresence>
           </div>
-          <button onClick={() => setCmd(true)} className="hidden h-10 items-center gap-2 rounded-xl border border-line bg-card px-3 text-[12.5px] text-ink3 hover:border-[#3f4551] md:flex" aria-label="Search">
+          <button onClick={() => setCmd(true)} className="hidden h-10 items-center gap-2 rounded-xl border border-line bg-card px-3 text-[12.5px] text-ink3 hover:border-line2 md:flex" aria-label="Search">
             <Search size={15} /> Search <kbd className="rounded border border-line px-1.5 font-mono text-[10px]">⌘K</kbd>
           </button>
           <button onClick={() => setCmd(true)} className="grid h-10 w-10 place-items-center rounded-xl border border-line bg-card text-ink2 md:hidden" aria-label="Search"><Search size={16} /></button>
           <div ref={bellRef} className="relative">
-            <button onClick={() => { setBell(!bell); if (!bell) setTimeout(markAllRead, 1200); }} className="relative grid h-10 w-10 place-items-center rounded-xl border border-line bg-card text-ink2 hover:border-[#3f4551]" aria-label="Notifications">
+            <button onClick={() => { setBell(!bell); if (!bell) setTimeout(markAllRead, 1200); }} className="relative grid h-10 w-10 place-items-center rounded-xl border border-line bg-card text-ink2 hover:border-line2" aria-label="Notifications">
               <Bell size={16} />
               {unread > 0 && <span className="absolute -right-1 -top-1 grid h-[18px] min-w-[18px] place-items-center rounded-full bg-crit px-1 font-mono text-[10px] font-semibold text-white">{unread > 9 ? "9+" : unread}</span>}
             </button>

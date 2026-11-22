@@ -28,7 +28,7 @@ function HowItWorks() {
         {FLOW.map((x, n) => {
           const done = n < step, on = n === step;
           return (
-            <button key={x.t} role="tab" aria-selected={on} tabIndex={on ? 0 : -1} onClick={() => setStep(n)} className={clsx("tap group relative flex items-center gap-3 rounded-2xl border p-3.5 text-left md:flex-col md:gap-0 md:p-4 md:text-center", on ? "border-accent/60 bg-accent/[0.08] shadow-[0_10px_30px_-14px_rgba(57,136,245,.8)]" : "border-line bg-bg2 hover:border-[#3f4551]")}>
+            <button key={x.t} role="tab" aria-selected={on} tabIndex={on ? 0 : -1} onClick={() => setStep(n)} className={clsx("tap group relative flex items-center gap-3 rounded-2xl border p-3.5 text-left md:flex-col md:gap-0 md:p-4 md:text-center", on ? "border-accent/60 bg-accent/[0.08] shadow-[0_10px_30px_-14px_rgba(57,136,245,.8)]" : "border-line bg-bg2 hover:border-line2")}>
               <span className={clsx("relative z-10 grid h-11 w-11 shrink-0 place-items-center rounded-xl border transition-colors md:mb-3", on ? "border-accent bg-accent text-white" : done ? "border-accent/40 bg-accent/15 text-accent" : "border-line bg-elev text-ink2 group-hover:text-accent")}>
                 {done ? <Check size={18} /> : <x.i size={18} />}
               </span>
@@ -154,7 +154,7 @@ export default function Methodology() {
           <CardHead title="Risk-scoring model · 5 pillars · 100 points" hint="Indicative screening thresholds, not universal industry standards. Level share of an indicator's maximum: Low 0% · Moderate 40% · High 70% · Critical 100%." />
           <div className="space-y-2.5">
             {MODEL.map(([n, pts, rule]) => (
-              <div key={n} className={`grid items-center gap-2 rounded-xl border p-3.5 md:grid-cols-[230px_1fr_120px] md:gap-5 ${n.startsWith("·") ? "ml-0 border-line bg-bg2 md:ml-6" : "border-[#3f4551] bg-elev"}`}>
+              <div key={n} className={`grid items-center gap-2 rounded-xl border p-3.5 md:grid-cols-[230px_1fr_120px] md:gap-5 ${n.startsWith("·") ? "ml-0 border-line bg-bg2 md:ml-6" : "border-line2 bg-elev"}`}>
                 <span className="text-[13.5px] font-medium">{n}</span>
                 <span className="font-mono text-[11.5px] text-ink2">{rule}</span>
                 <div className="flex items-center gap-2 md:justify-end"><div className="h-1.5 flex-1 rounded-full bg-elev md:hidden"><div className="h-full rounded-full bg-accent" style={{ width: `${pts * 4}%` }} /></div><span className="font-mono text-[12px] text-accent">{pts} pts · {pts}%</span></div>

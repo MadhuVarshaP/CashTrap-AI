@@ -13,7 +13,7 @@ import { fmtM, fmtNum, cur } from "@/lib/utilities/format";
 
 /** starting-point targets (days off DSO and DIO). DPO is left alone: stretching suppliers is a choice with its own risk. */
 const SCEN = [
-  { id: "cons", name: "Conservative", dso: 8, dio: 5, color: "#A2A7B0", note: "Tighter follow-up on overdue accounts and stock" },
+  { id: "cons", name: "Conservative", dso: 8, dio: 5, color: "var(--c-tick)", note: "Tighter follow-up on overdue accounts and stock" },
   { id: "base", name: "Base", dso: 15, dio: 10, color: "#3988F5", note: "Revised credit terms, collections and purchasing discipline" },
   { id: "opt", name: "Optimistic", dso: 25, dio: 15, color: "#35C994", note: "Full return toward prior-year days" },
 ];
@@ -225,12 +225,12 @@ export default function CashImpact() {
               <div className="h-[170px]">
                 <ResponsiveContainer>
                   <BarChart data={cmp} margin={{ top: 4, right: 4, left: -18, bottom: 0 }}>
-                    <CartesianGrid stroke="#23262d" vertical={false} />
-                    <XAxis dataKey="name" stroke="#707681" fontSize={11} tickLine={false} axisLine={false} />
-                    <YAxis stroke="#707681" fontSize={11} tickLine={false} axisLine={false} unit="d" />
-                    <Tooltip {...chartTooltip} cursor={{ fill: "#ffffff08" }} formatter={(x: number, n: string) => [`${x.toFixed(1)} days`, n === "current" ? "Current" : "Target"]} />
-                    <Legend wrapperStyle={{ fontSize: 11, color: "#A2A7B0" }} formatter={(x) => (x === "current" ? "Current" : "Target")} />
-                    <RBar dataKey="current" fill="#707681" radius={[3, 3, 0, 0]} maxBarSize={26} animationDuration={500} />
+                    <CartesianGrid stroke="var(--c-grid)" vertical={false} />
+                    <XAxis dataKey="name" stroke="var(--c-axis)" fontSize={11} tickLine={false} axisLine={false} />
+                    <YAxis stroke="var(--c-axis)" fontSize={11} tickLine={false} axisLine={false} unit="d" />
+                    <Tooltip {...chartTooltip} cursor={{ fill: "var(--c-cursor)" }} formatter={(x: number, n: string) => [`${x.toFixed(1)} days`, n === "current" ? "Current" : "Target"]} />
+                    <Legend wrapperStyle={{ fontSize: 11, color: "var(--c-tick)" }} formatter={(x) => (x === "current" ? "Current" : "Target")} />
+                    <RBar dataKey="current" fill="var(--c-axis)" radius={[3, 3, 0, 0]} maxBarSize={26} animationDuration={500} />
                     <RBar dataKey="target" fill="#3988F5" radius={[3, 3, 0, 0]} maxBarSize={26} animationDuration={500} />
                   </BarChart>
                 </ResponsiveContainer>
@@ -242,7 +242,7 @@ export default function CashImpact() {
             <div className="mb-2 font-mono text-[10.5px] uppercase tracking-wider text-ink3">Quick scenarios · DSO and DIO only, DPO unchanged</div>
             <div className="grid gap-4 md:grid-cols-3">
               {SCEN.map((s, i) => (
-                <button key={s.id} onClick={() => applyPreset(i)} aria-pressed={sel === i} className={clsx("tap rounded-card border bg-card p-5 text-left", sel === i ? "border-[#4a505c] bg-elev" : "border-line hover:border-[#3a3f49]")}>
+                <button key={s.id} onClick={() => applyPreset(i)} aria-pressed={sel === i} className={clsx("tap rounded-card border bg-card p-5 text-left", sel === i ? "border-line2 bg-elev" : "border-line hover:border-line2")}>
                   <div className="flex items-center gap-2 text-[13px] font-medium"><span className="h-2.5 w-2.5 rounded-full" style={{ background: s.color }} />{s.name}</div>
                   <div className="mt-2 font-display text-[22px] font-semibold tabular-nums">{scen[i] == null ? "—" : `${cur()} ${fmtNum(scen[i])}m`}</div>
                   <div className="mt-1 font-mono text-[11px] text-ink3">DSO −{s.dso}d · DIO −{s.dio}d</div>

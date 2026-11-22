@@ -33,7 +33,7 @@ export function Dropzone({ onParsed, onError }: { onParsed: (r: FinancialRecord[
         onDrop={(e) => { e.preventDefault(); setOver(false); handle(e.dataTransfer.files[0]); }}
         onClick={() => input.current?.click()}
         role="button" tabIndex={0} onKeyDown={(e) => e.key === "Enter" && input.current?.click()}
-        className={clsx("flex min-h-[210px] cursor-pointer flex-col items-center justify-center rounded-2xl border border-dashed px-6 py-8 text-center transition-colors", over ? "border-accent bg-accent/[0.06]" : "border-[#3a3f49] bg-bg2 hover:border-ink3")}
+        className={clsx("flex min-h-[210px] cursor-pointer flex-col items-center justify-center rounded-2xl border border-dashed px-6 py-8 text-center transition-colors", over ? "border-accent bg-accent/[0.06]" : "border-line2 bg-bg2 hover:border-ink3")}
       >
         <input ref={input} type="file" accept=".csv,.xlsx,.xls" hidden onChange={(e) => { handle(e.target.files?.[0]); e.target.value = ""; }} />
         <AnimatePresence mode="wait">

@@ -19,8 +19,8 @@ export function PillarRadar({ risk }: { risk: RiskResult }) {
     <div className="h-[300px]">
       <ResponsiveContainer>
         <RadarChart data={data} outerRadius="72%">
-          <PolarGrid stroke="#292D35" />
-          <PolarAngleAxis dataKey="name" tick={{ fill: "#A2A7B0", fontSize: 11 }} />
+          <PolarGrid stroke="var(--c-line)" />
+          <PolarAngleAxis dataKey="name" tick={{ fill: "var(--c-tick)", fontSize: 11 }} />
           <PolarRadiusAxis domain={[0, 100]} tick={false} axisLine={false} />
           <Tooltip {...chartTooltip} formatter={(v: number, _n: string, p: { payload?: { na?: boolean } }) => [p.payload?.na ? "Not Assessed" : `${v}% of assessable points`, "Risk"]} />
           <Radar dataKey="risk" stroke="#3988F5" fill="#3988F5" fillOpacity={0.28} strokeWidth={2} animationDuration={700} />
@@ -36,9 +36,9 @@ function PillarCard({ p, open, onToggle }: { p: RiskCategory; open: boolean; onT
   const applicable = p.indicators.filter((i) => i.applicable);
   const drivers = [...assessed].filter((i) => (i.points ?? 0) > 0).sort((x, y) => (y.points ?? 0) / y.max - (x.points ?? 0) / x.max).slice(0, 2);
   const na = p.points == null;
-  const col = na ? "#3a3f49" : LEVEL_HEX[p.severity];
+  const col = na ? "var(--c-muted)" : LEVEL_HEX[p.severity];
   return (
-    <div className={clsx("overflow-hidden rounded-2xl border bg-bg2", open ? "border-[#3f4551]" : "border-line")}>
+    <div className={clsx("overflow-hidden rounded-2xl border bg-bg2", open ? "border-line2" : "border-line")}>
       <button onClick={onToggle} aria-expanded={open} className="flex w-full items-center gap-3 p-4 text-left">
         <span className="h-10 w-1 shrink-0 rounded-full" style={{ background: col }} />
         <span className="min-w-0 flex-1">
