@@ -13,7 +13,7 @@ export const metadata: Metadata = {
   icons: { icon: "/favicon.svg" },
   description: "Financial due diligence for private equity: find the cash traps before you invest.",
 };
-export const viewport: Viewport = { themeColor: "#0A0B0D", width: "device-width", initialScale: 1 };
+export const viewport: Viewport = { themeColor: "#F3F5F8", width: "device-width", initialScale: 1 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (

@@ -2,14 +2,24 @@
 @tailwind components;
 @tailwind utilities;
 
-html { background: #0A0B0D; color-scheme: dark; }
+/* light theme: tokens are RGB triplets so Tailwind opacity modifiers keep working */
+:root {
+  --bg: 243 245 248; --bg2: 247 248 250; --card: 255 255 255; --elev: 238 241 246;
+  --line: 229 232 238; --line2: 205 211 221;
+  --ink: 20 24 33; --ink2: 82 90 105; --ink3: 125 133 148;
+  --accent: 47 120 238; --pos: 20 160 110; --warn: 217 133 20; --crit: 222 69 69; --ai: 124 92 224;
+  /* chart / SVG colours */
+  --c-grid: #E8EBF0; --c-axis: #8A91A0; --c-tick: #525A69; --c-muted: #CBD0D9; --c-card: #FFFFFF; --c-elev: #EEF1F6; --c-line: #E4E7EE; --c-cursor: rgba(20,24,33,.05); --c-ink: #141821;
+}
+html { background: rgb(var(--bg)); color-scheme: light; }
+body { background: rgb(var(--bg)); color: rgb(var(--ink)); }
 body { overflow-x: hidden; font-feature-settings: "tnum" 1, "cv11" 1; }
 .tabular-nums, .font-mono { font-variant-numeric: tabular-nums; }
-::selection { background: rgba(57, 136, 245, .35); }
-* { scrollbar-width: thin; scrollbar-color: #292D35 transparent; }
-input[type="range"] { accent-color: #3988F5; }
+::selection { background: rgba(47, 120, 238, .22); }
+* { scrollbar-width: thin; scrollbar-color: #CDD3DD transparent; }
+input[type="range"] { accent-color: #2F78EE; }
 /* text fields show focus by a lighter fill, not a border or outline */
-:focus-visible { outline: 2px solid #3988F5; outline-offset: 2px; }
+:focus-visible { outline: 2px solid #2F78EE; outline-offset: 2px; }
 input:not([type="range"]):not([type="checkbox"]):not([type="file"]):focus-visible, select:focus-visible { outline: none; }
 
 /* shared press / hover feel for every clickable control */
