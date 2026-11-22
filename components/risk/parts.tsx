@@ -5,6 +5,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { ChevronDown, CircleSlash } from "lucide-react";
 import { useEffect, useState } from "react";
 import { SEV } from "@/components/shared/ui";
+import { useAutoCollapse } from "@/lib/utilities/useAutoCollapse";
 import { levelName } from "@/lib/calculations/pe-risk";
 import type { Indicator, Severity } from "@/types/finance";
 
@@ -23,6 +24,7 @@ export function LevelBadge({ level, className, na }: { level: Severity | null; c
 /** one scored indicator: value, prior value, the threshold it was judged against, points and the reasoning */
 export function IndicatorCard({ i, defaultOpen = false }: { i: Indicator; defaultOpen?: boolean }) {
   const [open, setOpen] = useState(defaultOpen);
+  useAutoCollapse(open, () => setOpen(false));
   return (
     <div className={clsx("overflow-hidden rounded-2xl border bg-card", open ? "border-[#3f4551]" : "border-line")}>
       <button onClick={() => setOpen(!open)} aria-expanded={open} className="flex w-full items-start gap-3 p-4 text-left sm:items-center sm:gap-4 sm:p-5">
@@ -38,8 +40,8 @@ export function IndicatorCard({ i, defaultOpen = false }: { i: Indicator; defaul
         {open && (
           <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
             <div className="space-y-4 border-t border-line p-4 sm:p-5">
-              <div className="grid gap-2.5 sm:grid-cols-3">
-                {[["Actual value", i.actual], ["Previous year", i.previous], ["Proposed screening threshold", i.benchmark]].map(([l, v]) => (
+              <div className="grid gap-2.5 sm:grid-cols-2">
+                {[["Actual value", i.actual], ["Previous year", i.previous]].map(([l, v]) => (
                   <div key={l} className="rounded-xl bg-bg2 p-3"><div className="font-mono text-[10px] uppercase tracking-wider text-ink3">{l}</div><div className="mt-1 text-[12.5px] leading-snug text-ink">{v}</div></div>
                 ))}
               </div>

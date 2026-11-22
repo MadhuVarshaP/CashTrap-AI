@@ -4,6 +4,7 @@ import clsx from "clsx";
 import { AnimatePresence, motion } from "framer-motion";
 import { ChevronDown } from "lucide-react";
 import { useState } from "react";
+import { useAutoCollapse } from "@/lib/utilities/useAutoCollapse";
 import { PolarAngleAxis, PolarGrid, PolarRadiusAxis, Radar, RadarChart, ResponsiveContainer, Tooltip } from "recharts";
 import { Bar, Card, CardHead, chartTooltip } from "@/components/shared/ui";
 import type { RiskCategory, RiskResult } from "@/types/finance";
@@ -85,7 +86,8 @@ function PillarCard({ p, open, onToggle }: { p: RiskCategory; open: boolean; onT
 
 export function PillarSection({ risk }: { risk: RiskResult }) {
   const worst = [...risk.categories].filter((p) => p.points != null && p.max).sort((a, b) => b.points! / b.max - a.points! / a.max)[0];
-  const [openId, setOpenId] = useState<string | null>(worst && worst.points! > 0 ? worst.id : null);
+  const [openId, setOpenId] = useState<string | null>(null);
+  useAutoCollapse(openId !== null, () => setOpenId(null));
   return (
     <div className="grid gap-5 xl:col-span-12 xl:grid-cols-12">
       <Card className="xl:col-span-5">
