@@ -24,15 +24,24 @@ export interface Valuation {
   wcExcess: Num;
   /** one-off cash from cutting DSO by 15 days */
   cashRelease15: Num;
+  /** existing net debt + new acquisition debt - cash the deal can use */
+  postNetDebt: Num;
+  postLeverage: Num; // post-acquisition net debt / adjusted EBITDA
+  /** enterprise value less acquisition debt: the equity cheque the structure implies */
+  equityRequirement: Num;
+  availableCash: Num;
+  /** EV was derived from an entered entry multiple rather than typed in */
+  evDerived: boolean;
+  enterpriseValue: Num;
   returns: Returns | null;
 }
 
 export interface Returns {
   holdYears: number;
   growth: number; // % a year
-  growthSource: "entered" | "historical (capped 0-10%)";
+  growthSource: string;
   exitMultiple: number;
-  exitMultipleSource: "entered" | "entry multiple";
+  exitMultipleSource: string;
   exitEbitda: number;
   exitEv: number;
   paydown: Num; // cumulative acquisition debt repaid from free cash flow, null when capex unknown
@@ -46,12 +55,14 @@ export function buildValuation(a: AnalysisResult): Valuation {
   const i = a.inputs, c = a.latestRecord, p = a.previousRecord;
   const rep = c.ebitda ?? null;
   const adj = adjustedEbitda(c, i, true);
-  const ev = i.enterpriseValue ?? null;
+  const evEntered = i.enterpriseValue ?? null;
+  const evDerived = evEntered == null && i.entryMultiple != null && adj != null && adj > 0;
+  const ev = evEntered ?? (evDerived ? i.entryMultiple! * adj! : null);
   const eq = i.equityInvested ?? null;
   const entered = i.acquisitionDebt ?? null;
   const debtDerived = entered == null && ev != null && eq != null;
   const acqDebt = entered ?? (debtDerived ? ev! - eq! : null);
-  const nd = c.debt != null && c.cash != null ? c.debt - c.cash : null;
+  const nd = i.existingNetDebt ?? (c.debt != null && c.cash != null ? c.debt - c.cash : null);
 
   const owcPct = (r: typeof c | null) => (r && r.receivables != null && r.inventory != null && r.payables != null && r.revenue ? (r.receivables + r.inventory - r.payables) / r.revenue : null);
   const wcNow = owcPct(c), wcPrev = owcPct(p);
@@ -81,7 +92,12 @@ export function buildValuation(a: AnalysisResult): Valuation {
     };
   }
 
+  const cashUsed = i.availableCash ?? null;
+  const post = nd != null && acqDebt != null ? nd + acqDebt - (cashUsed ?? 0) : null;
   return {
+    postNetDebt: post, postLeverage: post != null && adj != null && adj > 0 ? post / adj : null,
+    equityRequirement: ev != null && acqDebt != null ? ev - acqDebt : null,
+    availableCash: cashUsed, evDerived, enterpriseValue: ev,
     reportedEbitda: rep, adjustedEbitda: adj,
     normalisation: rep != null && adj != null ? adj - rep : null,
     entryMultiple: ev != null && adj != null && adj > 0 ? ev / adj : null,
@@ -95,4 +111,16 @@ export function buildValuation(a: AnalysisResult): Valuation {
     cashRelease15: salesBase != null && a.latest.dso != null ? cashRelease(salesBase, a.latest.dso, Math.max(0, a.latest.dso - 15)) : null,
     returns,
   };
+}
+
+/** the same returns arithmetic for any growth / exit-multiple / hold combination (used for the base, downside and upside cases) */
+export function scenarioReturns(a: AnalysisResult, g: number, H: number, xm: number, label: string): Returns | null {
+  const v = buildValuation(a), c = a.latestRecord;
+  const eq = a.inputs.equityInvested, adj = v.adjustedEbitda, acq = v.acquisitionDebt;
+  if (v.enterpriseValue == null || eq == null || eq <= 0 || adj == null || adj <= 0 || acq == null || H <= 0) return null;
+  const fcfConv = c.operatingCashFlow != null && c.capex != null ? (c.operatingCashFlow - c.capex) / adj : null;
+  let pay: number | null = null;
+  if (fcfConv != null) { pay = 0; for (let t = 1; t <= H; t++) pay += Math.max(0, adj * Math.pow(1 + g / 100, t) * fcfConv); }
+  const exitE = adj * Math.pow(1 + g / 100, H), exitEv = exitE * xm, exitNd = acq - (pay ?? 0), exitEq = exitEv - exitNd, moic = exitEq / eq;
+  return { holdYears: H, growth: g, growthSource: label, exitMultiple: xm, exitMultipleSource: label, exitEbitda: exitE, exitEv, paydown: pay, exitNetDebt: exitNd, exitEquity: exitEq, moic, irr: moic > 0 ? (Math.pow(moic, 1 / H) - 1) * 100 : -100 };
 }
