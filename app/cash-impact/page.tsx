@@ -166,12 +166,6 @@ export default function CashImpact() {
               </div>
             </div>
           </div>
-          <div className="mt-5 rounded-xl border border-line bg-bg2 p-3.5 font-mono text-[11px] leading-relaxed text-ink2">
-            Receivables = (Credit sales ÷ 365) × (Current DSO − Target DSO)<br />
-            Inventory = (COGS ÷ 365) × (Current DIO − Target DIO)<br />
-            Payables = (Purchases ÷ 365) × (Target DPO − Current DPO)<br />
-            Total = Receivables + Inventory + Payables
-          </div>
         </Card>
 
         <div className="space-y-5 xl:col-span-8">

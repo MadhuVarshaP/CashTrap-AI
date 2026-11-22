@@ -10,7 +10,7 @@ import { Waterfall } from "@/components/charts/Waterfall";
 import { NumInput, Stat } from "@/components/risk/parts";
 import { axisM } from "@/components/risk/charts";
 import { WithAnalysis } from "@/components/shared/Guard";
-import { Card, CardHead, PageTitle, Pill, chartTooltip } from "@/components/shared/ui";
+import { Card, CardHead, PageTitle, chartTooltip } from "@/components/shared/ui";
 import { buildBridge, bridgeSteps, type BridgeYear } from "@/lib/calculations/cashbridge";
 import { useApp } from "@/lib/state/store";
 import { DASH, fmtM, fmtPct, cur } from "@/lib/utilities/format";
@@ -23,7 +23,7 @@ export default function BridgePage() {
 const fy = (y: number) => `FY${String(y).slice(2)}`;
 
 function Page({ a }: { a: AnalysisResult }) {
-  const { updateInputs, active } = useApp();
+  const { updateInputs } = useApp();
   const years = useMemo(() => buildBridge(a), [a]);
   const [yr, setYr] = useState(a.latestRecord.year);
   const b = years.find((x) => x.year === yr) ?? years[years.length - 1];
@@ -88,7 +88,7 @@ function Page({ a }: { a: AnalysisResult }) {
                   );
                 })}
               </div>
-              <p className="mt-4 rounded-xl border border-line bg-bg2 p-3 text-[12px] leading-relaxed text-ink3">Assumes reported operating cash flow is struck after interest and tax paid, the usual presentation. If the source reports interest in financing activities, the interest line should be read as zero.</p>
+              <p className="mt-4 rounded-xl border border-line bg-bg2 p-3 text-[12px] leading-relaxed text-ink3">Assumes reported operating cash flow is struck after interest and tax paid. The working-capital movement uses year-end balances (receivables + inventory − payables), so it can differ from the cash-flow statement's own lines. Only the working-capital line is working capital.</p>
             </>
           )}
         </Card>
@@ -156,10 +156,6 @@ function Page({ a }: { a: AnalysisResult }) {
         </Card>
       </div>
 
-      <div className="mt-5 flex gap-3 rounded-2xl border border-line bg-card p-4 text-[12.5px] leading-relaxed text-ink2">
-        <Info size={17} className="mt-0.5 shrink-0 text-accent" />
-        <p>Figures are calculated from the uploaded statements. The working-capital movement uses year-end balances (receivables + inventory − payables), so it can differ from the cash-flow statement&apos;s own working-capital lines. Only the working-capital line is working capital: taxes, interest and other items are shown separately and are never labelled as trapped cash.</p>
-      </div>
     </>
   );
 }

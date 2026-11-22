@@ -7,7 +7,7 @@ import Link from "next/link";
 import { Fragment, useMemo, useState } from "react";
 import { CashBridge, WorkingCapitalChart } from "@/components/charts/Charts";
 import { RiskGauge } from "@/components/charts/RiskGauge";
-import { ContributionChart, CashFlowChart, DebtChart, EbitdaMarginChart, OwcChart, StressChart } from "@/components/risk/charts";
+import { CashFlowChart, DebtChart, EbitdaMarginChart, OwcChart, StressChart } from "@/components/risk/charts";
 import { IndicatorCard, LEVEL_HEX, LevelBadge, NumInput, Stat } from "@/components/risk/parts";
 import { WithAnalysis } from "@/components/shared/Guard";
 import { Bar, Button, Card, CardHead, PageTitle, Pill } from "@/components/shared/ui";
@@ -97,7 +97,7 @@ function PillarHeader({ p }: { p: RiskCategory }) {
     </Card>
   );
 }
-const Indicators = ({ p }: { p: RiskCategory }) => <div className="space-y-3">{p.indicators.map((i, k) => <IndicatorCard key={i.id} i={i} defaultOpen={k === 0 && i.points != null} />)}</div>;
+const Indicators = ({ p }: { p: RiskCategory }) => <div className="space-y-3">{p.indicators.map((i) => <IndicatorCard key={i.id} i={i} />)}</div>;
 
 /* ------------------------------------------------------------------ dashboard */
 
@@ -144,12 +144,7 @@ function Dashboard({ a, go }: { a: AnalysisResult; go: (t: Tab) => void }) {
         <div className="mt-5 flex flex-wrap items-center justify-between gap-2 border-t border-line pt-4 font-mono text-[11px] text-ink3"><span>WEIGHTS 25 · 25 · 20 · 20 · 10 = 100</span><span>0–24 LOW · 25–49 MODERATE · 50–74 HIGH · 75+ CRITICAL</span></div>
       </Card>
 
-      <Card className="xl:col-span-5">
-        <CardHead title="Risk contribution" hint="Points each pillar adds to the overall score (of 100 assessable)." />
-        <div className="h-[300px]"><ContributionChart risk={risk} /></div><p className="mt-3 font-mono text-[10.5px] text-ink3">POINTS OF {risk.maxEvaluated} ASSESSABLE · TOTAL {risk.rawPoints}</p>
-      </Card>
-
-      <Card className="xl:col-span-7">
+      <Card className="xl:col-span-12">
         <CardHead title="Risk heatmap" hint="Every indicator, coloured by risk level. Hatched = Not Assessed (data missing) or Not Applicable to this industry." right={<div className="hidden items-center gap-3 font-mono text-[10px] text-ink3 sm:flex">{(["Low", "Medium", "High", "Critical"] as const).map((l) => <span key={l} className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-sm" style={{ background: LEVEL_HEX[l] }} />{levelName(l)}</span>)}</div>} />
         <div className="space-y-3">
           {risk.categories.map((p) => (
@@ -168,20 +163,7 @@ function Dashboard({ a, go }: { a: AnalysisResult; go: (t: Tab) => void }) {
         </div>
       </Card>
 
-      <Card className="xl:col-span-6 !border-crit/20">
-        <CardHead icon={<AlertTriangle size={17} className="text-crit" />} title="Main financial warning signs" hint="Indicators rated High or Critical, largest first." />
-        <ul className="space-y-2.5">
-          {flags.slice(0, 6).map((i) => (
-            <li key={i.id} className="rounded-xl border border-line bg-bg2 p-3.5">
-              <div className="flex items-start justify-between gap-3"><span className="text-[13px] font-medium leading-snug">{i.name}</span><LevelBadge level={i.level} /></div>
-              <p className="mt-1.5 font-mono text-[11.5px] leading-relaxed text-ink2">{i.actual}</p>
-            </li>
-          ))}
-          {flags.length === 0 && <li className="flex items-center gap-2 text-[13px] text-pos"><CheckCircle2 size={15} />No indicator is rated High or Critical on the data supplied.</li>}
-        </ul>
-      </Card>
-
-      <Card className="xl:col-span-6">
+      <Card className="xl:col-span-12">
         <CardHead title="Assessment coverage" hint="Share of the applicable model the supplied data could support. Missing data is never scored as zero risk; not-applicable indicators are left out." />
         <div className="mb-2 flex items-baseline gap-2"><span className="font-display text-[34px] font-semibold tabular-nums">{risk.coverage}%</span><span className="text-ink3">of the model assessed · {risk.evaluated} of {risk.total} indicators</span></div>
         <Bar value={risk.coverage} max={100} color={risk.coverage >= 70 ? "#35C994" : "#F5A640"} className="h-2" />

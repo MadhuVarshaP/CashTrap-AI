@@ -5,9 +5,8 @@ import { AnimatePresence, motion } from "framer-motion";
 import { AlertTriangle, ArrowUpDown, CheckCircle2, Download, History, Loader2, Play, Search, Database, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { IndustryProfile } from "@/components/risk/IndustryProfile";
 import { Dropzone } from "@/components/shared/Dropzone";
-import { Bar, Button, Card, CardHead, PageTitle, Pill } from "@/components/shared/ui";
+import { Bar, Button, Card, CardHead, Pill } from "@/components/shared/ui";
 import { analyze } from "@/lib/calculations/analyze";
 import { useApp } from "@/lib/state/store";
 import { REQUIRED_COLUMNS, SAMPLE_CSV, dataQuality } from "@/lib/utilities/parse";
@@ -55,14 +54,12 @@ export default function CompanyAnalysis() {
   const issues = [...baseIssues, ...(active.fileCurrency && active.inputs?.currency && active.fileCurrency !== active.inputs.currency ? [{ level: "warning" as const, text: `Currency inconsistency: the file states ${active.fileCurrency} but the reporting currency is set to ${active.inputs.currency}. Figures are not converted.` }] : [])];
   const errs = issues.filter((i) => i.level === "error");
   const warnings: string[] = [];
-  if (dq.missing.length) warnings.push(`${dq.missing.length} missing value${dq.missing.length > 1 ? "s" : ""}: dependent indicators will be marked unavailable, not zero.`);
   if (active.records[0] && !active.records[0].opening && active.records[0].reportedDso == null) warnings.push("First-year DSO/DIO/DPO use closing balances only unless opening balances were supplied.");
   const ready = active.records.length >= 2 && errs.length === 0;
 
   return (
     <>
 
-      {hasCompany && <IndustryProfile />}
       <div className="grid gap-5 xl:grid-cols-12">
         <Card className={hasCompany ? "xl:col-span-7" : "xl:col-span-12"}>
           <CardHead title="Upload financial records" hint="Columns are matched by name; common aliases (Sales, OCF, Total Debt…) are recognised. Blank cells are treated as missing, never zero." />
@@ -116,13 +113,8 @@ export default function CompanyAnalysis() {
             </div>
             {gaps.length > 0 && (
               <div className="mt-4 rounded-xl border border-warn/25 bg-warn/5 p-3.5 text-[12.5px]">
-                <div className="mb-2 font-mono text-[10px] uppercase tracking-wider text-warn">What is missing</div>
-                <ul className="space-y-1.5">
-                  {gaps.map(([f, ys]) => (
-                    <li key={f} className="flex flex-wrap items-baseline gap-x-2 text-ink2"><span className="font-medium text-ink">{label(f)}</span><span className="font-mono text-[11px] text-ink3">{ys.length === active.records.length ? "all years" : ys.map((y) => `FY${y}`).join(", ")}</span></li>
-                  ))}
-                </ul>
-                <p className="mt-3 text-ink2">
+                <div className="mb-2 font-mono text-[10px] uppercase tracking-wider text-warn">Effect of the missing data</div>
+                <p className="text-ink2">
                   {!preview ? "At least two years are needed before analysis can run."
                     : preview.risk.insufficient ? <span className="text-crit">Analysis will run but the score will read “Insufficient data”: only {preview.risk.coverage}% of the 100-point model can be assessed and at least 40% is needed.</span>
                     : <>You can still run the analysis. <span className="text-ink">{preview.risk.evaluated} of {preview.risk.total}</span> risk indicators ({preview.risk.coverage}% of the model) can be assessed{off.length ? `; not assessed: ${off.slice(0, 5).map((c) => c.name).join(", ")}${off.length > 5 ? ` and ${off.length - 5} more` : ""}` : ""}. The score uses only the indicators that can be assessed.</>}
