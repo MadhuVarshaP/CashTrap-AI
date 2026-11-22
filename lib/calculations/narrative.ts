@@ -184,7 +184,9 @@ export function buildReport(a: AnalysisResult): ReportSection[] {
     asm("Recommended due diligence actions follow the order of risk points; the questions below ask for evidence and do not presume a finding."),
   ];
 
-  return [
+  const order: Tag[] = ["fact", "estimate", "assumption", "missing", "hypothesis"];
+  const ordered = (items: ReportItem[]) => [...items].sort((x, y) => order.indexOf(x.tag) - order.indexOf(y.tag)); // stable: same tag order in every section
+  const out: ReportSection[] = [
     { id: "summary", title: "Executive Investment Assessment", question: "Is the target financially healthy relative to its industry, and what matters most?", items: s1 },
     { id: "earnings", title: "Quality of Earnings and Cash Flow", question: "Are reported earnings supported by actual cash generation?", items: s2, questions: risk.categories[0].questions },
     { id: "wc", title: "Working Capital and Cash Release Opportunities", question: "Where is cash trapped, and how much could potentially be released?", items: s3, questions: risk.categories[2].questions },
@@ -192,4 +194,5 @@ export function buildReport(a: AnalysisResult): ReportSection[] {
     { id: "stress", title: "Acquisition Stress Test and Valuation", question: "How resilient is the company under stress, and what does the price imply?", items: s5 },
     { id: "flags", title: "Critical Red Flags and Recommended Due Diligence Actions", question: "What should be verified before committing capital?", items: s6, flags, questions: qs },
   ];
+  return out.map((sec) => ({ ...sec, items: ordered(sec.items) }));
 }

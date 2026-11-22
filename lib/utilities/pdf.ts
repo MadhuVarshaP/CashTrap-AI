@@ -25,34 +25,43 @@ export interface PdfMeta {
 export async function downloadReportPdf(meta: PdfMeta, sections: ReportSection[], fileName: string) {
   const { jsPDF } = await import("jspdf");
   const doc = new jsPDF({ unit: "mm", format: "a4" });
+  // the website's own typeface (Inter); falls back to the built-in font if the files can't be loaded
+  let FONT = "helvetica";
+  try {
+    const b64 = async (url: string) => { const buf = new Uint8Array(await (await fetch(url)).arrayBuffer()); let bin = ""; for (let i = 0; i < buf.length; i += 0x8000) bin += String.fromCharCode(...buf.subarray(i, i + 0x8000)); return btoa(bin); };
+    const [reg, bold] = await Promise.all([b64("/fonts/Inter-Regular.ttf"), b64("/fonts/Inter-SemiBold.ttf")]);
+    doc.addFileToVFS("Inter-Regular.ttf", reg); doc.addFont("Inter-Regular.ttf", "Inter", "normal");
+    doc.addFileToVFS("Inter-SemiBold.ttf", bold); doc.addFont("Inter-SemiBold.ttf", "Inter", "bold");
+    FONT = "Inter";
+  } catch { /* keep helvetica */ }
   const W = 210, H = 297, M = 16, CW = W - 2 * M;
   let y = M;
 
   const need = (h: number) => { if (y + h > H - 18) { doc.addPage(); y = M; } };
   const para = (text: string, x: number, width: number, size = 9.5, color: [number, number, number] = [40, 44, 52], style: "normal" | "bold" | "italic" = "normal", lh = 4.6) => {
-    doc.setFont("helvetica", style); doc.setFontSize(size); doc.setTextColor(...color);
+    doc.setFont(FONT, style === "bold" ? "bold" : "normal"); doc.setFontSize(size); doc.setTextColor(...color);
     for (const ln of doc.splitTextToSize(plain(text), width) as string[]) { need(lh); doc.text(ln, x, y); y += lh; }
   };
 
   // title block
   doc.setFillColor(23, 25, 30); doc.rect(0, 0, W, 40, "F");
-  doc.setFont("helvetica", "bold"); doc.setFontSize(9); doc.setTextColor(120, 165, 245); doc.text("CASHCOP AI  |  DUE DILIGENCE REPORT", M, 14);
+  doc.setFont(FONT, "bold"); doc.setFontSize(9); doc.setTextColor(120, 165, 245); doc.text("CASHCOP AI  |  DUE DILIGENCE REPORT", M, 14);
   doc.setFontSize(19); doc.setTextColor(245, 246, 248); doc.text(plain(meta.company), M, 25);
-  doc.setFont("helvetica", "normal"); doc.setFontSize(9); doc.setTextColor(170, 175, 185);
+  doc.setFont(FONT, "normal"); doc.setFontSize(9); doc.setTextColor(170, 175, 185);
   doc.text(plain(`${meta.period}   |   Generated ${meta.generated}`), M, 33);
   y = 50;
   const stats: [string, string][] = [["Investment Risk Index", meta.score], ["Model coverage", meta.coverage], ["Confidence", meta.confidence]];
   stats.forEach(([l, v], i) => {
     const x = M + i * (CW / 3);
-    doc.setFont("helvetica", "normal"); doc.setFontSize(7.5); doc.setTextColor(120, 125, 135); doc.text(l.toUpperCase(), x, y);
-    doc.setFont("helvetica", "bold"); doc.setFontSize(12); doc.setTextColor(30, 34, 42); doc.text(plain(v), x, y + 6);
+    doc.setFont(FONT, "normal"); doc.setFontSize(7.5); doc.setTextColor(120, 125, 135); doc.text(l.toUpperCase(), x, y);
+    doc.setFont(FONT, "bold"); doc.setFontSize(12); doc.setTextColor(30, 34, 42); doc.text(plain(v), x, y + 6);
   });
   y += 16;
   para("Decision support generated from deterministic calculations on the uploaded data. It is not investment advice. It does not recommend buying or rejecting the company, and the risk score is not a probability of failure.", M, CW, 8.5, [100, 105, 115], "italic");
   y += 3;
   // legend
   doc.setFontSize(7.5); let lx = M; need(6);
-  (Object.keys(TAG) as Tag[]).forEach((t) => { doc.setFont("helvetica", "bold"); doc.setTextColor(...TAG[t].rgb); doc.text(TAG[t].label, lx, y); lx += doc.getTextWidth(TAG[t].label) + 6; });
+  (Object.keys(TAG) as Tag[]).forEach((t) => { doc.setFont(FONT, "bold"); doc.setTextColor(...TAG[t].rgb); doc.text(TAG[t].label, lx, y); lx += doc.getTextWidth(TAG[t].label) + 6; });
   y += 8;
 
   sections.forEach((s, i) => {
@@ -63,12 +72,14 @@ export async function downloadReportPdf(meta: PdfMeta, sections: ReportSection[]
     y += 2;
     for (const it of s.items) {
       const tg = TAG[it.tag];
-      doc.setFont("helvetica", "bold"); doc.setFontSize(6.8);
-      const lines = doc.splitTextToSize(plain(it.text), CW - 26) as string[];
+      // measure with the same font and size the text is drawn in, otherwise lines run past the margin
+      doc.setFont(FONT, "normal"); doc.setFontSize(9.2);
+      const lines = doc.splitTextToSize(plain(it.text), CW - 28) as string[];
+      doc.setFont(FONT, "bold"); doc.setFontSize(6.8);
       need(lines.length * 4.4 + 1.5);
       doc.setTextColor(...tg.rgb); doc.text(tg.label, M, y);
-      doc.setFont("helvetica", "normal"); doc.setFontSize(9.2); doc.setTextColor(it.tag === "fact" ? 25 : 70, it.tag === "fact" ? 28 : 74, it.tag === "fact" ? 36 : 84);
-      lines.forEach((ln, k) => { doc.text(ln, M + 26, y + k * 4.4); });
+      doc.setFont(FONT, "normal"); doc.setFontSize(9.2); doc.setTextColor(it.tag === "fact" ? 25 : 70, it.tag === "fact" ? 28 : 74, it.tag === "fact" ? 36 : 84);
+      lines.forEach((ln, k) => { doc.text(ln, M + 28, y + k * 4.4); });
       y += lines.length * 4.4 + 1.8;
     }
     if (s.flags?.length) {
@@ -87,7 +98,7 @@ export async function downloadReportPdf(meta: PdfMeta, sections: ReportSection[]
 
   const n = doc.getNumberOfPages();
   for (let p = 1; p <= n; p++) {
-    doc.setPage(p); doc.setFont("helvetica", "normal"); doc.setFontSize(7.5); doc.setTextColor(140, 145, 155);
+    doc.setPage(p); doc.setFont(FONT, "normal"); doc.setFontSize(7.5); doc.setTextColor(140, 145, 155);
     doc.text(plain(`CashCop AI | ${meta.company} | decision support, not investment advice`), M, H - 9);
     doc.text(`Page ${p} of ${n}`, W - M, H - 9, { align: "right" });
   }
