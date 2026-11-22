@@ -3,7 +3,7 @@
 import { Bar, BarChart, CartesianGrid, Cell, ComposedChart, LabelList, Legend, Line, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { chartTooltip } from "@/components/shared/ui";
 import { adjustedEbitda } from "@/lib/calculations/pe-risk";
-import { scaleM } from "@/lib/utilities/format";
+import { scaleM, cur } from "@/lib/utilities/format";
 import type { AnalysisResult, RiskResult } from "@/types/finance";
 import { LEVEL_HEX } from "./parts";
 
@@ -11,9 +11,9 @@ const axis = { stroke: "#707681", fontSize: 11, tickLine: false, axisLine: false
 const grid = <CartesianGrid stroke="#23262d" vertical={false} />;
 const fy = (y: number) => `FY${String(y).slice(2)}`;
 const legend = { iconType: "circle" as const, iconSize: 7, wrapperStyle: { fontSize: 11, color: "#A2A7B0", paddingTop: 8 } };
-/** compact axis labels for AED millions so very large companies stay readable */
+/** compact axis labels for millions so very large companies stay readable */
 export const axisM = (v: number) => { const { n, unit } = scaleM(v, 0); return `${n}${unit}`; };
-const tipM = (v: number) => { const { n, unit } = scaleM(v, 1); return `AED ${n}${unit}`; };
+const tipM = (v: number) => { const { n, unit } = scaleM(v, 1); return `${cur()} ${n}${unit}`; };
 const C = { ebitda: "#35C994", ocf: "#F5A640", fcf: "#3988F5", crit: "#F06464", ai: "#A78BFA", muted: "#707681", stress: "#F06464" };
 
 export function EbitdaMarginChart({ a }: { a: AnalysisResult }) {

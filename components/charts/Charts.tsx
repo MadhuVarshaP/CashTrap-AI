@@ -1,5 +1,6 @@
 "use client";
 
+import { cur } from "@/lib/utilities/format";
 import { Area, Bar, BarChart, CartesianGrid, Cell, ComposedChart, Legend, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import type { AnalysisResult } from "@/types/finance";
 import { chartTooltip } from "@/components/shared/ui";
@@ -27,7 +28,7 @@ export function TrendChart({ a, series, mode, from }: { a: AnalysisResult; serie
         {grid}
         <XAxis dataKey="year" {...axis} />
         <YAxis {...axis} width={44} tickFormatter={(v) => (mode === "indexed" ? `${v}` : `${v}`)} domain={mode === "indexed" ? ["auto", "auto"] : [0, "auto"]} />
-        <Tooltip {...chartTooltip} formatter={(v: number, n: string) => [mode === "indexed" ? `${v.toFixed(0)} (base 100)` : `AED ${v.toFixed(1)}m`, label[n as Series]]} />
+        <Tooltip {...chartTooltip} formatter={(v: number, n: string) => [mode === "indexed" ? `${v.toFixed(0)} (base 100)` : `${cur()} ${v.toFixed(1)}m`, label[n as Series]]} />
         <Legend iconType="circle" iconSize={7} wrapperStyle={{ fontSize: 11, color: "#A2A7B0", paddingTop: 8 }} formatter={(v) => label[v as Series]} />
         {series.map((s) => <Line key={s} type="monotone" dataKey={s} stroke={COLORS[s]} strokeWidth={2.2} dot={{ r: 3.5, fill: "#17191E", strokeWidth: 2 }} activeDot={{ r: 5 }} animationDuration={700} />)}
       </ComposedChart>
@@ -64,7 +65,7 @@ export function DivergenceChart({ a }: { a: AnalysisResult }) {
         {grid}
         <XAxis dataKey="year" {...axis} />
         <YAxis {...axis} width={44} />
-        <Tooltip {...chartTooltip} formatter={(v: number | number[], n: string) => (n === "gap" ? [`AED ${(((v as number[])[1] - (v as number[])[0])).toFixed(1)}m`, "Cash gap"] : [`AED ${(v as number).toFixed(1)}m`, n === "ebitda" ? "EBITDA" : "Operating cash flow"])} />
+        <Tooltip {...chartTooltip} formatter={(v: number | number[], n: string) => (n === "gap" ? [`${cur()} ${(((v as number[])[1] - (v as number[])[0])).toFixed(1)}m`, "Cash gap"] : [`${cur()} ${(v as number).toFixed(1)}m`, n === "ebitda" ? "EBITDA" : "Operating cash flow"])} />
         <Area type="monotone" dataKey="gap" stroke="none" fill="#F06464" fillOpacity={0.16} animationDuration={700} />
         <Line type="monotone" dataKey="ebitda" stroke={COLORS.ebitda} strokeWidth={2.2} dot={{ r: 3.5, fill: "#17191E", strokeWidth: 2 }} animationDuration={700} />
         <Line type="monotone" dataKey="ocf" stroke={COLORS.ocf} strokeWidth={2.2} dot={{ r: 3.5, fill: "#17191E", strokeWidth: 2 }} animationDuration={700} />
@@ -121,7 +122,7 @@ export function CashBridge({ a }: { a: AnalysisResult }) {
         {grid}
         <XAxis dataKey="name" {...axis} interval={0} tick={{ fontSize: 10, fill: "#707681" }} />
         <YAxis {...axis} width={44} />
-        <Tooltip {...chartTooltip} cursor={{ fill: "#ffffff08" }} formatter={(_v, _n, p) => { const v = (p.payload as { v: number }).v; return [`${v >= 0 ? "+" : "−"}AED ${Math.abs(v).toFixed(1)}m`, ""]; }} separator="" />
+        <Tooltip {...chartTooltip} cursor={{ fill: "#ffffff08" }} formatter={(_v, _n, p) => { const v = (p.payload as { v: number }).v; return [`${v >= 0 ? "+" : "−"}${cur()} ${Math.abs(v).toFixed(1)}m`, ""]; }} separator="" />
         <Bar dataKey="base" stackId="w" fill="transparent" isAnimationActive={false} />
         <Bar dataKey="up" stackId="w" animationDuration={700}>{data.map((d, i) => <Cell key={i} fill={d.total ? "#3988F5" : "#35C994"} />)}</Bar>
         <Bar dataKey="down" stackId="w" fill="#F06464" radius={[4, 4, 0, 0]} animationDuration={700} />

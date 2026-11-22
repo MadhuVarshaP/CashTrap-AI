@@ -1,6 +1,6 @@
 "use client";
 
-import { scaleM } from "@/lib/utilities/format";
+import { scaleM, cur } from "@/lib/utilities/format";
 import clsx from "clsx";
 import { Info } from "lucide-react";
 import { motion } from "framer-motion";
@@ -16,9 +16,9 @@ export const SEV: Record<Severity, { text: string; bg: string; bar: string; hex:
   Critical: { text: "text-crit", bg: "bg-crit/15 border-crit/40", bar: "bg-crit", hex: "#F06464" },
 };
 
-export function Card({ className, children, hover = true }: { className?: string; children: ReactNode; hover?: boolean }) {
+export function Card({ className, children, hover = true, id }: { className?: string; children: ReactNode; hover?: boolean; id?: string }) {
   return (
-    <div className={clsx("rounded-card border border-line bg-card p-5 sm:p-6", hover && "transition-colors duration-200 hover:border-[#3a3f49]", className)}>
+    <div id={id} className={clsx("rounded-card border border-line bg-card p-5 sm:p-6", hover && "transition-colors duration-200 hover:border-[#3a3f49]", className)}>
       {children}
     </div>
   );
@@ -83,7 +83,7 @@ export function PageTitle({ title, sub, right }: { title: string; sub: string; r
   );
 }
 
-export function Money({ value, decimals = 1, prefix = "AED ", suffix = "m", className }: { value: number | null; decimals?: number; prefix?: string; suffix?: string; className?: string }) {
+export function Money({ value, decimals = 1, prefix = `${cur()} `, suffix = "m", className }: { value: number | null; decimals?: number; prefix?: string; suffix?: string; className?: string }) {
   const v = useCountUp(value ?? 0);
   if (value == null) return <span className={className}>—</span>;
   const sc = suffix === "m" ? scaleM(v, decimals) : { n: v.toLocaleString("en-US", { minimumFractionDigits: decimals, maximumFractionDigits: decimals }), unit: suffix };
