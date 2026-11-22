@@ -4,7 +4,6 @@ AI-assisted financial due diligence for private equity. CashCop AI looks past re
 profitability to show how efficiently a business actually turns profit into cash, and
 surfaces working-capital "cash traps" before capital is committed.
 
-> The bundled demo company, **GulfTech Manufacturing LLC**, and all of its figures are **synthetic**.
 > The scoring model is an illustrative screening methodology, not an investment decision.
 
 ## Run it
@@ -52,11 +51,14 @@ leaving **Output Directory** empty (not `public`). No environment variables are 
 
 | Route | Purpose |
 |---|---|
-| `/overview` | Investment Intelligence dashboard: KPIs, trends, risk snapshot, signals, working-capital cycle |
-| `/company-analysis` | Drag-and-drop CSV/Excel upload, validation, editable records table, data-quality panel, **Analyse Financials** |
-| `/investment-assessment` | **Investment Risk Analysis**: five-pillar score /100, heatmap, per-pillar tabs, interactive stress testing, valuation view, indicator register, investment findings |
-| `/cash-impact` | DSO scenario calculator (conservative / base / optimistic) with live AED cash-release |
-| `/due-diligence-report` | Six investor-question sections; facts, estimates, assumptions, missing data and hypotheses labelled; print / Markdown export |
+| `/overview` | Investment Overview: six headline KPIs, top concerns, five-pillar radar and pillar detail, trends, leverage |
+| `/investment-assessment` | Investment Risk Analysis: five-pillar score /100, per-pillar tabs, adjustable industry-aware **Thresholds**, indicator register, findings |
+| `/cash-impact` | Working-capital cash release: DSO, DIO and DPO with targets, waterfall, CCC, operating-cash constraint |
+| `/ebitda-cash-bridge` | Reported EBITDA → Adjusted → FCF before financing, cash gap drivers, multi-year comparison |
+| `/stress-testing` | Base / Downside / Severe scenarios with six adjustable assumptions and a comparison chart |
+| `/valuation` | Entry multiple, normalisation, post-deal leverage, equity requirement, returns; risk and attractiveness kept separate |
+| `/due-diligence-report` | Ten-section report with red-flag detail; downloadable PDF, print, Markdown |
+| `/company-analysis` | Upload (flat table, statement workbook, S&P), validation, field coverage, editable records |
 | `/methodology` | Formulas, scoring thresholds, AI rules, limitations |
 
 ## Architecture
@@ -70,7 +72,7 @@ components/
   shared/            ui primitives, Dropzone, Guard (requires analysis)
 lib/
   calculations/      metrics.ts · pe-risk.ts · stress.ts · valuation.ts · findings.ts · alerts.ts · analyze.ts · narrative.ts   (pure, UI-free)
-  demo-data/         gulftech.ts (synthetic)
+  demo-data/         gulftech.ts (sample company)
   utilities/         format.ts · parse.ts (CSV/XLSX + validation) · useCountUp.ts
   state/             store.tsx (datasets, analysis, toasts)
   api/client.ts      seam for the FastAPI backend
@@ -135,3 +137,7 @@ Desktop icon-rail sidebar (collapsible) → mobile bottom navigation; tables bec
 - **Assistant:** the floating chat button answers questions about the active company (risk score drivers, red flags, DSO/DIO/DPO, cash release, weights, upload help). By default it uses built-in answers computed from the same engine as the dashboard. Set `ANTHROPIC_API_KEY` (server-side, see `.env.example`) to route questions through Claude instead; the key never reaches the browser.
 - **Notifications:** uploads, parse errors, finished analyses and High/Critical signals appear as popups the moment they happen and are kept in the bell feed with an unread count. The bell offers optional desktop alerts for when the tab is in the background.
 - **Upload formats:** flat table, *Income Statement* + *Balance Sheet* workbook, and S&P Capital IQ *Financial Highlights* exports (the files in `data/`). Provider exports carry reported DSO/DIO but no payables, so DPO and the cash conversion cycle show as unavailable and the score uses the remaining indicators.
+
+## Industry-specific risk engine
+
+Choose the target's industry (16 options, optional sub-industry) on Investment Risk or Company Analysis. The choice selects benchmarks, changes scoring thresholds and decides which indicators apply (e.g. DIO is Not Applicable for software; most industrial ratios are Not Applicable for financial services). Sourced benchmarks (EBITDA margin, DSO, DIO, DPO, CCC, Debt/EBITDA, interest coverage) are medians of US industry-group aggregates from Damodaran Online (NYU Stern, Jan 2026), in `lib/benchmarks/`. Where no verified source exists the app says "Industry Benchmark Unavailable" and scores on a labelled proposed screening threshold; users can enter their own benchmarks and thresholds.

@@ -172,7 +172,7 @@ export default function Methodology() {
         <Card className="xl:col-span-6 !border-warn/25">
           <CardHead title="Data limitations & disclaimers" />
           <ul className="space-y-2.5 text-[13px] leading-relaxed text-ink2">
-            {["Annual, year-end data can hide intra-year swings and seasonality.", "Credit sales and purchases are approximated by revenue and COGS when not supplied.", "First-year working-capital metrics use closing balances only.", "Thresholds are illustrative screening bands, not a definitive investment decision.", "The demo company, GulfTech Manufacturing LLC, and all its figures are synthetic.", "This tool supports, and does not replace, professional due diligence."].map((t) => <li key={t} className="flex gap-2.5"><span className="mt-2 h-1 w-1 shrink-0 rounded-full bg-warn" />{t}</li>)}
+            {["Annual, year-end data can hide intra-year swings and seasonality.", "Credit sales and purchases are approximated by revenue and COGS when not supplied.", "First-year working-capital metrics use closing balances only.", "Thresholds are illustrative screening bands, not a definitive investment decision.", "This tool supports, and does not replace, professional due diligence."].map((t) => <li key={t} className="flex gap-2.5"><span className="mt-2 h-1 w-1 shrink-0 rounded-full bg-warn" />{t}</li>)}
           </ul>
         </Card>
       </div>
