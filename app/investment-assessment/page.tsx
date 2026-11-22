@@ -15,8 +15,12 @@ import { buildFindings } from "@/lib/calculations/findings";
 import { adjustedEbitda, allIndicators, levelName } from "@/lib/calculations/pe-risk";
 import { DEFAULT_STRESS, runStress, type StressInput } from "@/lib/calculations/stress";
 import { buildValuation } from "@/lib/calculations/valuation";
+import { THRESHOLD_DEFS, resolveThresholds } from "@/lib/calculations/thresholds";
+import { IndustryProfile } from "@/components/risk/IndustryProfile";
+import { INDICATOR_METRIC, METRIC, getBench, benchRange, fmtBench, type BenchMetric } from "@/lib/benchmarks/resolve";
+import { industryById } from "@/lib/benchmarks/industries";
 import { useApp } from "@/lib/state/store";
-import { fmtDays, fmtM, fmtPct, fmtX, signed } from "@/lib/utilities/format";
+import { fmtDays, fmtM, fmtPct, fmtX, signed, cur } from "@/lib/utilities/format";
 import type { AnalysisResult, AssessmentInputs, RiskCategory } from "@/types/finance";
 
 const TABS = [
@@ -27,6 +31,7 @@ const TABS = [
   { id: "debt", label: "Debt & repayment" },
   { id: "liq", label: "Liquidity & stress" },
   { id: "val", label: "Valuation" },
+  { id: "thr", label: "Thresholds" },
   { id: "reg", label: "Indicator register" },
 ] as const;
 type Tab = (typeof TABS)[number]["id"];
@@ -51,6 +56,7 @@ function Page({ a }: { a: AnalysisResult }) {
       <PageTitle title="Investment Risk Analysis" sub="Five pillars of financial risk, scored from the data, evidenced and ready to investigate." right={
         <div className="flex flex-wrap gap-2"><Pill tone="warn">Screening score · not a recommendation</Pill><Link href="/due-diligence-report"><Button variant="ghost"><FileText size={14} /> Due diligence report</Button></Link></div>
       } />
+      <IndustryProfile />
       <div role="tablist" aria-label="Investment risk sections" className="-mx-4 mb-6 flex gap-1.5 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0">
         {TABS.map((t) => (
           <button key={t.id} role="tab" aria-selected={tab === t.id} onClick={() => setTab(t.id)} className={clsx("tap shrink-0 rounded-xl border px-4 py-2.5 text-[13px]", tab === t.id ? "border-accent/50 bg-accent/10 text-ink" : "border-line bg-card text-ink2 hover:border-[#3f4551] hover:text-ink")}>{t.label}</button>
@@ -64,9 +70,10 @@ function Page({ a }: { a: AnalysisResult }) {
         {tab === "debt" && <Debt a={a} pillar={risk.categories[3]} />}
         {tab === "liq" && <Liquidity a={a} pillar={risk.categories[4]} />}
         {tab === "val" && <Valuation a={a} />}
+        {tab === "thr" && <Thresholds a={a} />}
         {tab === "reg" && <Register a={a} />}
       </motion.div>
-      <p className="mt-8 rounded-2xl border border-line p-4 text-[11.5px] leading-relaxed text-ink3">This is a screening score, not a probability of investment failure or an investment recommendation. Thresholds are indicative screening bands, not industry standards; industry benchmarks are not used unless a reliable comparable dataset is supplied. A flagged indicator is a potential risk to investigate, not proof of fraud, poor management or bad debt.</p>
+      <p className="mt-8 rounded-2xl border border-line p-4 text-[11.5px] leading-relaxed text-ink3">This is a screening score, not a probability of investment failure or an investment recommendation. Thresholds are proposed screening bands, not industry standards. Industry benchmarks (Damodaran, US listed companies) are applied only where a verified figure exists for the selected industry; otherwise “Industry Benchmark Unavailable” is shown. A flagged indicator is a potential risk to investigate, not proof of fraud, poor management or bad debt.</p>
     </>
   );
 }
@@ -99,7 +106,8 @@ function Dashboard({ a, go }: { a: AnalysisResult; go: (t: Tab) => void }) {
   const delta = risk.score != null && a.previousScore != null ? risk.score - a.previousScore : null;
   const inds = allIndicators(risk);
   const flags = inds.filter((i) => i.level === "High" || i.level === "Critical").sort((x, y) => (y.points ?? 0) - (x.points ?? 0));
-  const unassessed = inds.filter((i) => i.points == null);
+  const unassessed = inds.filter((i) => i.points == null && i.applicable);
+  const notApplicable = inds.filter((i) => !i.applicable);
   const findings = useMemo(() => buildFindings(a), [a]);
   return (
     <div className="grid gap-5 xl:grid-cols-12">
@@ -108,9 +116,10 @@ function Dashboard({ a, go }: { a: AnalysisResult; go: (t: Tab) => void }) {
         <RiskGauge risk={risk} size={240} />
         <div className="mt-5 grid grid-cols-3 gap-2.5">
           <Stat label="Points" value={risk.insufficient ? "—" : `${risk.rawPoints}/${risk.maxEvaluated}`} />
-          <Stat label="Coverage" value={`${risk.coverage}%`} tone={risk.coverage < 70 ? "warn" : undefined} />
+          <Stat label="Data coverage" value={`${risk.coverage}%`} tone={risk.coverage < 70 ? "warn" : undefined} />
           <Stat label="vs prior yr" value={delta == null ? "n/a" : signed(delta, 0, " pts")} tone={delta == null ? undefined : delta > 0 ? "crit" : "pos"} />
         </div>
+        <div className="mt-4 rounded-xl border border-line bg-bg2 p-3.5 text-[12px] leading-relaxed text-ink2"><span className="font-mono text-[10px] uppercase tracking-wider text-ink3">Confidence · </span><span className={clsx("font-medium", risk.confidence.level === "High" ? "text-pos" : risk.confidence.level === "Low" ? "text-crit" : "text-warn")}>{risk.confidence.level}</span> <span className="text-ink3">(separate from the score)</span><br />{risk.confidence.reasons.join(" · ")}.</div>
         {risk.insufficient && <p role="alert" className="mt-4 rounded-xl border border-warn/30 bg-warn/5 p-3 text-[12.5px] text-warn">Less than {40}% of the model could be assessed, so no overall score is shown. Add the missing data listed under Coverage.</p>}
         <p className="mt-4 font-mono text-[10.5px] text-ink3">LAST ASSESSED {new Date(a.generatedAt).toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" }).toUpperCase()}</p>
       </Card>
@@ -141,16 +150,16 @@ function Dashboard({ a, go }: { a: AnalysisResult; go: (t: Tab) => void }) {
       </Card>
 
       <Card className="xl:col-span-7">
-        <CardHead title="Risk heatmap" hint="Every indicator, coloured by risk level. Hatched = not assessed because data is missing." right={<div className="hidden items-center gap-3 font-mono text-[10px] text-ink3 sm:flex">{(["Low", "Medium", "High", "Critical"] as const).map((l) => <span key={l} className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-sm" style={{ background: LEVEL_HEX[l] }} />{levelName(l)}</span>)}</div>} />
+        <CardHead title="Risk heatmap" hint="Every indicator, coloured by risk level. Hatched = Not Assessed (data missing) or Not Applicable to this industry." right={<div className="hidden items-center gap-3 font-mono text-[10px] text-ink3 sm:flex">{(["Low", "Medium", "High", "Critical"] as const).map((l) => <span key={l} className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-sm" style={{ background: LEVEL_HEX[l] }} />{levelName(l)}</span>)}</div>} />
         <div className="space-y-3">
           {risk.categories.map((p) => (
             <div key={p.id}>
               <div className="mb-1.5 font-mono text-[10px] uppercase tracking-wider text-ink3">{p.name}</div>
               <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4">
                 {p.indicators.map((i) => (
-                  <button key={i.id} onClick={() => go(p.id as Tab)} title={`${i.name}: ${levelName(i.level)}${i.points != null ? ` (${i.points}/${i.max})` : ""}`} className="min-h-[52px] rounded-lg border px-2.5 py-2 text-left" style={i.level ? { background: LEVEL_HEX[i.level] + "22", borderColor: LEVEL_HEX[i.level] + "66" } : { background: "repeating-linear-gradient(135deg,#1d2026 0 5px,#17191E 5px 10px)", borderColor: "#292D35" }}>
+                  <button key={i.id} onClick={() => go(p.id as Tab)} title={`${i.name}: ${levelName(i.level)}${i.points != null ? ` (${i.points}/${i.max})` : ""}`} className="min-h-[52px] rounded-lg border px-2.5 py-2 text-left" style={i.level ? { background: LEVEL_HEX[i.level] + "22", borderColor: LEVEL_HEX[i.level] + "66" } : { background: "repeating-linear-gradient(135deg,#1d2026 0 5px,#17191E 5px 10px)", borderColor: i.applicable ? "#292D35" : "#292D35", opacity: i.applicable ? 1 : 0.6 }}>
                     <span className="line-clamp-2 block text-[11px] leading-tight text-ink2">{i.name}</span>
-                    <span className="mt-0.5 block font-mono text-[10px] text-ink3">{i.points == null ? "n/a" : `${i.points}/${i.max}`}</span>
+                    <span className="mt-0.5 block font-mono text-[10px] text-ink3">{!i.applicable ? "N/A" : i.points == null ? "not assessed" : `${i.points}/${i.max}`}</span>
                   </button>
                 ))}
               </div>
@@ -173,9 +182,15 @@ function Dashboard({ a, go }: { a: AnalysisResult; go: (t: Tab) => void }) {
       </Card>
 
       <Card className="xl:col-span-6">
-        <CardHead title="Assessment coverage" hint="Share of the 100-point model the supplied data could support. Missing data is never scored as zero risk." />
+        <CardHead title="Assessment coverage" hint="Share of the applicable model the supplied data could support. Missing data is never scored as zero risk; not-applicable indicators are left out." />
         <div className="mb-2 flex items-baseline gap-2"><span className="font-display text-[34px] font-semibold tabular-nums">{risk.coverage}%</span><span className="text-ink3">of the model assessed · {risk.evaluated} of {risk.total} indicators</span></div>
         <Bar value={risk.coverage} max={100} color={risk.coverage >= 70 ? "#35C994" : "#F5A640"} className="h-2" />
+        {notApplicable.length > 0 && (
+          <div className="mt-4">
+            <div className="mb-2 font-mono text-[10px] uppercase tracking-wider text-ink3">Not applicable to {risk.industry.name} ({notApplicable.length}): excluded from the score</div>
+            <p className="rounded-lg bg-bg2 px-3 py-2 text-[12px] leading-relaxed text-ink2">{notApplicable.map((i) => i.name).join(" · ")}</p>
+          </div>
+        )}
         {unassessed.length > 0 && (
           <div className="mt-4">
             <div className="mb-2 font-mono text-[10px] uppercase tracking-wider text-ink3">Not assessed ({unassessed.length})</div>
@@ -231,7 +246,7 @@ function QoE({ a, pillar }: { a: AnalysisResult; pillar: RiskCategory }) {
         <Card className="xl:col-span-5">
           <CardHead title="EBITDA adjustments" hint={`For FY${c.year}. Only adjustments marked verified are added to EBITDA. Do not assume a one-off is legitimate: require documents.`} />
           <div className="grid gap-3">
-            <NumInput label="Adjustment claimed (AED m)" value={i.ebitdaAdjustment} unit="AED m" onCommit={(n) => updateInputs({ ebitdaAdjustment: n })} hint="Positive adds back cost; negative removes income." />
+            <NumInput label={`Adjustment claimed (${cur()} m)`} value={i.ebitdaAdjustment} unit={`${cur()} m`} onCommit={(n) => updateInputs({ ebitdaAdjustment: n })} hint="Positive adds back cost; negative removes income." />
             <label className="block"><span className="mb-1.5 block font-mono text-[10.5px] uppercase tracking-wider text-ink3">Support status</span>
               <select value={i.adjustmentStatus ?? ""} onChange={(e) => updateInputs({ adjustmentStatus: (e.target.value || undefined) as AssessmentInputs["adjustmentStatus"] })} className="h-11 w-full rounded-xl border border-line bg-bg2 px-3 text-[13px] outline-none focus:border-accent"><option value="">Not entered</option>{STATUS.map((s) => <option key={s.v} value={s.v}>{s.l}</option>)}</select>
             </label>
@@ -383,11 +398,11 @@ function Valuation({ a }: { a: AnalysisResult }) {
   return (
     <div className="grid gap-5 xl:grid-cols-12">
       <Card className="xl:col-span-5">
-        <CardHead title="Acquisition inputs" hint="Enter the deal assumptions in AED millions. Nothing here is estimated for you." />
+        <CardHead title="Acquisition inputs" hint={`Enter the deal assumptions in ${cur()} millions. Nothing here is estimated for you.`} />
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">
-          <NumInput label="Proposed enterprise value" value={i.enterpriseValue} unit="AED m" onCommit={(n) => updateInputs({ enterpriseValue: n })} />
-          <NumInput label="Acquisition debt" value={i.acquisitionDebt} unit="AED m" onCommit={(n) => updateInputs({ acquisitionDebt: n })} hint="Left blank = enterprise value − equity." />
-          <NumInput label="Equity invested" value={i.equityInvested} unit="AED m" onCommit={(n) => updateInputs({ equityInvested: n })} />
+          <NumInput label="Proposed enterprise value" value={i.enterpriseValue} unit={`${cur()} m`} onCommit={(n) => updateInputs({ enterpriseValue: n })} />
+          <NumInput label="Acquisition debt" value={i.acquisitionDebt} unit={`${cur()} m`} onCommit={(n) => updateInputs({ acquisitionDebt: n })} hint="Left blank = enterprise value − equity." />
+          <NumInput label="Equity invested" value={i.equityInvested} unit={`${cur()} m`} onCommit={(n) => updateInputs({ equityInvested: n })} />
           <NumInput label="Holding period" value={i.holdYears} unit="years" onCommit={(n) => updateInputs({ holdYears: n })} hint="Default 5." />
           <NumInput label="EBITDA growth" value={i.ebitdaGrowth} unit="% a year" onCommit={(n) => updateInputs({ ebitdaGrowth: n })} hint="Default: historical, capped 0–10%." />
           <NumInput label="Exit multiple" value={i.exitMultiple} unit="x EBITDA" onCommit={(n) => updateInputs({ exitMultiple: n })} hint="Default: entry multiple." />
@@ -438,16 +453,16 @@ function Register({ a }: { a: AnalysisResult }) {
     <Card hover={false}>
       <CardHead title="Indicator register" hint="Every indicator with its actual and previous value, the threshold it was judged against, the level and points assigned, and the reason." />
       <div className="-mx-5 overflow-x-auto px-5">
-        <table className="w-full min-w-[960px] border-collapse text-left text-[12px]">
-          <thead><tr className="border-b border-line font-mono text-[10px] uppercase tracking-wider text-ink3">{["Indicator", "Actual", "Previous", "Threshold", "Level", "Points", "Explanation"].map((h) => <th key={h} className="px-2 py-2.5 font-medium">{h}</th>)}</tr></thead>
+        <table className="w-full min-w-[1180px] border-collapse text-left text-[12px]">
+          <thead><tr className="border-b border-line font-mono text-[10px] uppercase tracking-wider text-ink3">{["Indicator", "Actual", "Industry median", "Typical range", "Risk threshold", "Level", "Points", "Explanation"].map((h) => <th key={h} className="px-2 py-2.5 font-medium">{h}</th>)}</tr></thead>
           <tbody>
             {a.risk.categories.map((p) => (
               <Fragment key={p.id}>
-                <tr className="bg-bg2"><td colSpan={7} className="px-2 py-2 font-display text-[12.5px] font-medium">{p.name} <span className="font-mono text-[10.5px] text-ink3">· {p.weight} pts weight</span></td></tr>
+                <tr className="bg-bg2"><td colSpan={8} className="px-2 py-2 font-display text-[12.5px] font-medium">{p.name} <span className="font-mono text-[10.5px] text-ink3">· {p.weight} pts weight</span></td></tr>
                 {p.indicators.map((i) => (
                   <tr key={i.id} className="border-b border-line align-top">
-                    <td className="px-2 py-3 text-ink">{i.name}</td><td className="px-2 py-3 font-mono text-[11px] text-ink2">{i.actual}</td><td className="px-2 py-3 font-mono text-[11px] text-ink3">{i.previous}</td>
-                    <td className="px-2 py-3 text-ink3">{i.benchmark}</td><td className="px-2 py-3"><LevelBadge level={i.level} /></td>
+                    <td className="px-2 py-3 text-ink">{i.name}</td><td className="px-2 py-3 font-mono text-[11px] text-ink2">{i.actual}</td><td className="px-2 py-3 font-mono text-[11px] text-ink3">{i.applicable ? i.bench?.median ?? "—" : "N/A"}</td><td className="px-2 py-3 font-mono text-[11px] text-ink3">{i.bench?.range ?? "—"}</td>
+                    <td className="px-2 py-3 text-ink3">{i.applicable ? i.benchmark : "—"}</td><td className="px-2 py-3"><LevelBadge level={i.level} na={!i.applicable} /></td>
                     <td className="px-2 py-3 font-mono tabular-nums">{i.points == null ? "—" : `${i.points}/${i.max}`}</td><td className="px-2 py-3 text-ink2">{i.explanation}</td>
                   </tr>
                 ))}
@@ -458,5 +473,87 @@ function Register({ a }: { a: AnalysisResult }) {
       </div>
       <p className="mt-4 text-[11.5px] text-ink3">Points = indicator maximum × level share (Low 0% · Moderate 40% · High 70% · Critical 100%). Overall score = points earned ÷ points assessable × 100.</p>
     </Card>
+  );
+}
+
+
+/* ------------------------------------------------------------------ thresholds */
+
+const METRICS = Object.keys(METRIC) as BenchMetric[];
+
+function Thresholds({ a }: { a: AnalysisResult }) {
+  const { updateInputs } = useApp();
+  const { cuts, customised, sources } = resolveThresholds(a.inputs);
+  const def = industryById(a.inputs.industry);
+  const custom = a.inputs.customBench ?? {};
+  const setCuts = (key: string, idx: number, v: number | null) => {
+    const cur = [...(a.inputs.thresholds?.[key] ?? cuts[key])];
+    if (v == null) return;
+    cur[idx] = v;
+    updateInputs({ thresholds: { ...(a.inputs.thresholds ?? {}), [key]: cur } });
+  };
+  const clear = (key: string) => { const t = { ...(a.inputs.thresholds ?? {}) }; delete t[key]; updateInputs({ thresholds: t }); };
+  const setBench = (m: BenchMetric, field: "median" | "low" | "high", v: number | null) => {
+    const next = { ...custom, [m]: { ...(custom[m] ?? {}), [field]: v } };
+    if (next[m].median == null && next[m].low == null && next[m].high == null) delete next[m];
+    updateInputs({ customBench: next });
+  };
+  const order = (d: (typeof THRESHOLD_DEFS)[number], c: number[]) => (d.dir === "min" ? c[0] >= c[1] && c[1] >= c[2] : c[0] <= c[1] && c[1] <= c[2]);
+  const tag: Record<string, string> = { default: "generic default", "industry preset": `${def?.name ?? "industry"} preset (proposed)`, "benchmark-derived": "derived from benchmark", "custom override": "your override" };
+  return (
+    <div className="space-y-5">
+      <Card hover={false}>
+        <CardHead title={`Industry benchmarks: ${def?.name ?? "none selected"}`} hint="The median, typical range and risk threshold are three different things. The median is the middle of the industry distribution, the typical range is its 25th to 75th percentile, and the risk threshold is where scoring turns a level up. The industry average is never treated as the target." />
+        {!def ? <p className="text-[13px] text-ink2">Select an industry in the profile above to load benchmarks.</p> : (
+          <div className="-mx-5 overflow-x-auto px-5">
+            <table className="w-full min-w-[980px] border-collapse text-left text-[12px]">
+              <thead><tr className="border-b border-line font-mono text-[10px] uppercase tracking-wider text-ink3">{["Metric", "Median", "Typical range", "Tier · market · year", "Reliability", "Your benchmark (median / low / high)"].map((h) => <th key={h} className="px-2 py-2.5 font-medium">{h}</th>)}</tr></thead>
+              <tbody>
+                {METRICS.map((m) => {
+                  const base = getBench(def, a.inputs.subIndustry, m, undefined);
+                  const eff = getBench(def, a.inputs.subIndustry, m, a.inputs.customBench);
+                  const isCustom = eff.status === "custom";
+                  const used = Object.entries(INDICATOR_METRIC).some(([, mm]) => mm === m);
+                  return (
+                    <tr key={m} className="border-b border-line align-top">
+                      <td className="px-2 py-3 text-ink">{METRIC[m].label}{!used && <span className="ml-1 text-ink3">(context)</span>}</td>
+                      <td className="px-2 py-3 font-mono text-[11.5px]">{eff.status === "unavailable" ? <span className="text-warn">Industry Benchmark Unavailable</span> : fmtBench(eff.median, m)}</td>
+                      <td className="px-2 py-3 font-mono text-[11.5px] text-ink2">{eff.status === "unavailable" ? "—" : benchRange(eff, m)}</td>
+                      <td className="px-2 py-3 text-[11.5px] text-ink3">{eff.status === "unavailable" ? "Proposed screening threshold" : `${eff.tier} · ${eff.geography} · ${eff.year}`}{eff.status === "sourced" && <div className="mt-0.5">{eff.groups} industry group{eff.groups > 1 ? "s" : ""}, {eff.firms} firms</div>}</td>
+                      <td className="px-2 py-3 text-[11.5px] text-ink3">{eff.reliability}{base.url && !isCustom && <a href={base.url} target="_blank" rel="noreferrer" className="mt-0.5 block text-accent hover:underline">Source: Damodaran</a>}</td>
+                      <td className="px-2 py-2">
+                        <div className="grid grid-cols-3 gap-1.5">
+                          {(["median", "low", "high"] as const).map((f) => <NumInput key={f} label={f === "median" ? "Median" : f === "low" ? "Low" : "High"} value={custom[m]?.[f]} onCommit={(n) => setBench(m, f, n)} />)}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+        <p className="mt-4 text-[11.5px] leading-relaxed text-ink3">Sourced figures are medians of US industry-group aggregates from Damodaran Online (NYU Stern, January 2026), computed here; DSO = receivables ÷ sales × 365, DIO and DPO use COGS. Leverage is gross debt incl. leases ÷ EBITDA and coverage is EBIT ÷ interest, so they are not like-for-like with this model&apos;s net-debt and EBITDA ratios. No benchmark is shown where no verified source exists. Entering your own benchmark overrides the sourced one and is marked as user-entered.</p>
+      </Card>
+      <Card hover={false}>
+        <CardHead title="Scoring thresholds" hint="Three cut-offs per indicator: Low / Moderate / High. Anything beyond the last is Critical. These are proposed screening thresholds, not published standards." right={customised.length ? <Pill tone="accent">{customised.length} customised</Pill> : <Pill>No overrides</Pill>} />
+        <div className="space-y-3">
+          {THRESHOLD_DEFS.map((d) => {
+            const c = a.inputs.thresholds?.[d.key] ?? cuts[d.key];
+            const isCustom = d.key in (a.inputs.thresholds ?? {});
+            const tags = d.dir === "min" ? ["Low ≥", "Moderate ≥", "High ≥"] : ["Low ≤", "Moderate ≤", "High ≤"];
+            return (
+              <div key={d.key} className="grid items-end gap-3 rounded-xl border border-line bg-bg2 p-3.5 md:grid-cols-[1.2fr_repeat(3,1fr)_auto]">
+                <div><div className="text-[13px] font-medium">{d.label}</div><div className="font-mono text-[10.5px] text-ink3">{d.unit} · {d.dir === "min" ? "higher is better" : "lower is better"} · {tag[sources[d.key]]}</div></div>
+                {c.map((v, i) => <NumInput key={i} label={tags[i]} value={v} unit={d.unit} onCommit={(n) => setCuts(d.key, i, n)} />)}
+                <button onClick={() => clear(d.key)} disabled={!isCustom} className="tap h-11 rounded-xl border border-line px-3 text-[12px] text-ink2 disabled:opacity-30">Reset</button>
+                {!order(d, c) && <p role="alert" className="text-[11.5px] text-crit md:col-span-5">Cut-offs must be in order ({d.dir === "min" ? "descending" : "ascending"}); invalid values are ignored.</p>}
+              </div>
+            );
+          })}
+        </div>
+        <p className="mt-3 text-[11.5px] text-ink3">Changing the industry resets these to that industry&apos;s proposed thresholds. This app has no user accounts yet, so anyone using this browser session can adjust them; your changes are saved with the company in this browser only.</p>
+      </Card>
+    </div>
   );
 }
