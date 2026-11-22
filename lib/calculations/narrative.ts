@@ -1,8 +1,14 @@
 import type { AnalysisResult, Severity } from "@/types/finance";
-import { fmtDays, fmtM, fmtPct, fmtX, growth } from "@/lib/utilities/format";
+import { fmtDays, fmtM, fmtPct, fmtX, growth, cur } from "@/lib/utilities/format";
 import { cashRelease } from "./metrics";
 import { buildFindings } from "./findings";
 import { adjustedEbitda, allIndicators, levelName } from "./pe-risk";
+import { buildBridge } from "./cashbridge";
+import { BASE_CASE, DOWNSIDE_CASE, SEVERE_CASE, runCase } from "./scenarios";
+import { dayValue, potentialRelease } from "./wc-release";
+import { impact as sizeImpact, WHY } from "./findings";
+import { resolveIndustry, fmtBench, benchRange, METRIC, type BenchMetric } from "@/lib/benchmarks/resolve";
+import { scenarioReturns } from "./valuation";
 import { buildValuation } from "./valuation";
 
 /** Deterministic narrative. Uses only figures from the calculation engine; no model call. */
@@ -34,6 +40,16 @@ export interface ReportSection {
   question: string;
   items: ReportItem[];
   questions?: string[];
+  /** structured red flags (section 6) */
+  flags?: RedFlag[];
+}
+export interface RedFlag {
+  title: string;
+  level: string;
+  shows: string;
+  matters: string;
+  implication: string;
+  investigate: string[];
 }
 
 const f = (text: string): ReportItem => ({ tag: "fact", text });
@@ -44,12 +60,14 @@ const hyp = (text: string): ReportItem => ({ tag: "hypothesis", text });
 const pctS = (g: number | null) => (g == null ? "n/a" : `${g >= 0 ? "+" : ""}${(g * 100).toFixed(1)}%`);
 
 /**
- * Six-section investor report. Rules it follows: evidence before conclusions, material risks first,
- * impact quantified where the data allows, facts kept apart from estimates / assumptions / hypotheses,
- * and no buy or reject recommendation.
+ * Six-section investor report. Every section carries at least three substantive lines. Rules it follows: each statement
+ * traces to uploaded data or a calculated output; the selected industry's benchmark is named wherever one exists and
+ * "Industry Benchmark Unavailable" is stated where it does not; calculated findings (Fact, Estimate) stay apart from
+ * assumptions and interpretations; no buy or reject recommendation.
  */
 export function buildReport(a: AnalysisResult): ReportSection[] {
   const { risk, latest: m, previous: pm, latestRecord: c, previousRecord: p } = a;
+  const ctx = resolveIndustry(a.inputs);
   const inds = allIndicators(risk);
   const ind = (id: string) => inds.find((i) => i.id === id)!;
   const findings = buildFindings(a, 3);
@@ -59,90 +77,119 @@ export function buildReport(a: AnalysisResult): ReportSection[] {
   const e = adjustedEbitda(c, a.inputs, true);
   const fcf = c.operatingCashFlow != null && c.capex != null ? c.operatingCashFlow - c.capex : null;
   const flagged = inds.filter((i) => i.level === "High" || i.level === "Critical").sort((x, y) => (y.points ?? 0) - (x.points ?? 0));
-  const strong = inds.filter((i) => i.level === "Low" && i.points === 0 && ["lev", "int", "liqr", "ocf", "margin", "vol", "dscr"].includes(i.id));
   const lvl = (i: { level: Severity | null; points: number | null; max: number }) => `${levelName(i.level)}, ${i.points}/${i.max} pts`;
+  const line = (i: ReturnType<typeof ind>) => i.applicable ? (i.points != null ? f(`${i.name}: ${i.actual} (${lvl(i)}). ${i.explanation}`) : miss(`${i.name}: Not Assessed. Needs ${i.requires.join(" and ").toLowerCase()}.`)) : miss(`${i.name}: Not Applicable to ${ctx.name}; excluded from the score.`);
+  const bridge = buildBridge(a).find((b) => b.year === c.year);
+  const lev = m.netDebt != null && e != null && e > 0 ? m.netDebt / e : null;
 
-  // ---- 1 executive summary
+  /** company value against the selected industry's benchmark, or an honest statement that there is none */
+  const vs = (metric: BenchMetric, value: number | null, label?: string): ReportItem => {
+    const name = label ?? METRIC[metric].label;
+    if (value == null) return miss(`${name}: company value not available, so no industry comparison can be made.`);
+    if (!ctx.selected) return miss(`${name} is ${fmtBench(value, metric)}. No industry is selected, so there is no benchmark to compare it with.`);
+    const b = ctx.bench(metric);
+    if (b.status === "unavailable" || b.median == null) return miss(`${name} is ${fmtBench(value, metric)}. Industry Benchmark Unavailable for ${ctx.name}; the score uses a proposed screening threshold instead.`);
+    const pos = b.low != null && value < b.low ? "below" : b.high != null && value > b.high ? "above" : "within";
+    return f(`${name} is ${fmtBench(value, metric)} against a ${ctx.name} median of ${fmtBench(b.median, metric)} (typical range ${benchRange(b, metric)}): ${pos} the typical range. ${b.status === "custom" ? "Benchmark entered by the user." : `${b.tier} benchmark, ${b.geography}, ${b.year}; ${b.reliability}.`}`);
+  };
+
+  // ---- 1 executive investment assessment
   const s1: ReportItem[] = [
-    f(risk.score == null ? `Overall screening score not available: only ${risk.coverage}% of the model could be assessed.` : `Screening score ${risk.score}/100 (${risk.classification}), assessed on ${risk.coverage}% of the 100-point model (${risk.evaluated} of ${risk.total} indicators).`),
-    f(`FY${c.year}: revenue ${fmtM(c.revenue)} (${pctS(rg)}), EBITDA ${fmtM(c.ebitda)} (${pctS(eg)}), operating cash flow ${fmtM(c.operatingCashFlow)} (${pctS(og)}).`),
-    f(m.netDebt != null ? (m.netDebt <= 0 ? `Net cash position of ${fmtM(-m.netDebt)}.` : `Net debt ${fmtM(m.netDebt)}${m.netDebtToEbitda != null ? `, ${fmtX(m.netDebtToEbitda)} EBITDA` : ""}.`) : "Net debt could not be computed."),
-    ...(strong.length ? [f(`Low-risk on the evidence: ${strong.slice(0, 4).map((i) => `${i.name} — ${i.actual}`).join("; ")}.`)] : []),
-    ...(findings.length ? [f(`Most material risks, largest first: ${findings.map((x) => x.title.toLowerCase()).join("; ")}.`), ...findings.map((x) => x.impact ? est(`${x.title}: ${x.impact}.`) : f(`${x.title}: ${x.evidence}.`))] : [f("No indicator scored risk points on the data supplied.")]),
-    ...(risk.coverage < 100 ? [miss(`${100 - risk.coverage}% of the model could not be assessed because data was not supplied; the score is incomplete.`)] : []),
-    ...(findings.length && m.ccc != null && pm?.ccc != null && m.ccc > pm.ccc ? [hyp("The pattern is consistent with growth being funded by working capital rather than cash generation. This is a hypothesis for the team to test, not a conclusion.")] : []),
+    f(risk.score == null ? `No overall score is shown: only ${risk.coverage}% of the applicable model could be assessed. ${risk.industry.focus}` : `Investment Risk Index ${risk.score}/100, classified ${risk.classification}, assessed on ${risk.coverage}% of the model that applies to ${ctx.name} (${risk.evaluated} of ${risk.total} applicable indicators${risk.notApplicable ? `; ${risk.notApplicable} not applicable` : ""}). Confidence in the score is ${risk.confidence.level}: ${risk.confidence.reasons.join("; ")}.`),
+    ctx.selected ? f(`Industry basis: ${ctx.name}${ctx.subName ? ` (${ctx.subName})` : ""}. ${risk.industry.focus}`) : asm("No industry was selected, so generic proposed screening thresholds were applied and no industry comparison is possible."),
+    vs("ebitdaMargin", m.ebitdaMargin == null ? null : m.ebitdaMargin * 100, "EBITDA margin"),
+    f(`FY${c.year}: revenue ${fmtM(c.revenue)} (${pctS(rg)}), EBITDA ${fmtM(c.ebitda)} (${pctS(eg)}), operating cash flow ${fmtM(c.operatingCashFlow)} (${pctS(og)}). ${e != null && c.operatingCashFlow != null && e > 0 ? `Operating cash flow was ${fmtPct(c.operatingCashFlow / e, 0)} of adjusted EBITDA.` : ""}`),
+    f(m.netDebt != null ? (m.netDebt <= 0 ? `Net cash position of ${fmtM(-m.netDebt)}.` : `Net debt ${fmtM(m.netDebt)}${lev != null ? `, ${fmtX(lev)} adjusted EBITDA` : ""}.`) : "Net debt could not be computed from the supplied data."),
+    ...(findings.length ? [f(`Most important concerns, largest first: ${findings.map((x) => x.title.toLowerCase()).join("; ")}.`), ...findings.map((x) => x.impact ? est(`${x.title}: ${x.impact}.`) : f(`${x.title}: ${x.evidence}.`))] : [f("No applicable indicator scored risk points on the data supplied.")]),
+    asm("Investment risk and investment attractiveness are separate questions. The score is not a probability of failure, and this report makes no buy or reject recommendation."),
+    ...(risk.coverage < 100 ? [miss(`${100 - risk.coverage}% of the applicable model could not be assessed because data was not supplied; the score is incomplete.`)] : []),
   ];
 
-  // ---- 2 earnings quality
-  const qoe = risk.categories[0];
+  // ---- 2 quality of earnings and cash flow
+  const adjSt = a.inputs.adjustmentStatus;
   const s2: ReportItem[] = [
-    f(`Revenue ${fmtM(p?.revenue)} → ${fmtM(c.revenue)} (${pctS(rg)}); EBITDA ${fmtM(p?.ebitda)} → ${fmtM(c.ebitda)} (${pctS(eg)}); EBITDA margin ${fmtPct(pm?.ebitdaMargin ?? null)} → ${fmtPct(m.ebitdaMargin)}.`),
-    ...qoe.indicators.filter((i) => i.points != null).sort((x, y) => (y.points ?? 0) - (x.points ?? 0)).map((i) => f(`${i.name}: ${i.actual} (${lvl(i)}).`)),
-    ...(a.inputs.ebitdaAdjustment != null && a.inputs.adjustmentStatus ? [f(`EBITDA adjustment of ${fmtM(a.inputs.ebitdaAdjustment)} entered as “${a.inputs.adjustmentStatus.replace("-", " ")}”. Adjusted EBITDA ${fmtM(v.adjustedEbitda)} versus reported ${fmtM(v.reportedEbitda)}.`)] : [miss("No EBITDA adjustments entered: adjusted EBITDA is taken as reported EBITDA. Unsupported one-offs can't be assessed.")]),
-    ...(ind("revq").points != null && (ind("revq").points ?? 0) > 0 ? [hyp("Revenue growth that is not collected may reflect looser credit terms, customer concentration or revenue recognised ahead of billing. None of these is confirmed.")] : []),
-    ...(ind("margin").points != null && (ind("margin").points ?? 0) > 0 ? [hyp("Margin erosion may come from pricing, mix or input costs; the data supplied does not say which.")] : []),
+    f(`Revenue ${fmtM(p?.revenue)} → ${fmtM(c.revenue)} (${pctS(rg)}); reported EBITDA ${fmtM(p?.ebitda)} → ${fmtM(c.ebitda)} (${pctS(eg)}); EBITDA margin ${fmtPct(pm?.ebitdaMargin ?? null)} → ${fmtPct(m.ebitdaMargin)}.`),
+    ...(adjSt && a.inputs.ebitdaAdjustment != null ? [f(`EBITDA adjustment of ${fmtM(a.inputs.ebitdaAdjustment)} entered as “${adjSt.replace("-", " ")}”. ${adjSt === "verified" ? `Adjusted EBITDA is ${fmtM(v.adjustedEbitda)} versus reported ${fmtM(v.reportedEbitda)}.` : "It is not counted: adjusted EBITDA equals reported EBITDA until it is verified."}`)] : [miss("No EBITDA adjustments entered: adjusted EBITDA is taken as reported EBITDA, and unsupported one-offs cannot be assessed.")]),
+    e != null && c.operatingCashFlow != null ? f(e > 0 ? `EBITDA-to-operating-cash conversion is ${fmtPct(c.operatingCashFlow / e, 0)}: ${fmtM(e - c.operatingCashFlow)} of adjusted EBITDA did not arrive as operating cash. ${ind("ocf").bench?.status === "unavailable" ? "Industry Benchmark Unavailable for cash conversion; it is scored on a proposed screening threshold (" + ind("ocf").benchmark + ")." : ""}` : "EBITDA is not positive, so cash conversion is not meaningful.") : miss("Cash conversion could not be computed."),
+    ...(fcf != null ? [f(`Free cash flow is ${fmtM(fcf)} after capex of ${fmtM(c.capex)}${fcf < 0 ? ": operating cash flow does not cover capex, so the business is consuming cash after investment" : ""}.`)] : [miss("Capital expenditure not supplied: free cash flow cannot be computed.")]),
+    ...(bridge && bridge.gap != null ? [f(`EBITDA-to-cash bridge FY${bridge.year}: the ${fmtM(bridge.gap)} cash gap splits into working-capital movement ${fmtM(bridge.wcIncrease)}, cash taxes ${bridge.taxes == null ? "not supplied" : fmtM(bridge.taxes)}, cash interest ${bridge.interest == null ? "not supplied" : fmtM(bridge.interest)} and other ${fmtM(bridge.drivers[3].value)}. Only the working-capital line is working capital.`)] : []),
+    ...["adj", "revq", "margin", "vol", "ocf", "fcf", "cons"].map(ind).filter((i) => i.applicable && i.points != null && i.points > 0).map(line),
+    ...((ind("revq").points ?? 0) > 0 ? [hyp("Interpretation, not a calculated finding: revenue growth that is not collected may reflect looser credit terms, customer concentration or revenue recognised ahead of billing.")] : []),
   ];
 
-  // ---- 3 cash flow & working capital
+  // ---- 3 working capital and cash release
   const tied = (d: number | null | undefined, base: number | null | undefined) => (d != null && base != null ? (d * base) / 365 : null);
-  const dsoTie = tied(m.dso != null && pm?.dso != null ? m.dso - pm.dso : null, sales), dioTie = tied(m.dio != null && pm?.dio != null ? m.dio - pm.dio : null, c.cogs), dpoTie = tied(m.dpo != null && pm?.dpo != null ? m.dpo - pm.dpo : null, c.cogs);
+  const dsoTie = tied(m.dso != null && pm?.dso != null ? m.dso - pm.dso : null, sales), dioTie = tied(m.dio != null && pm?.dio != null ? m.dio - pm.dio : null, c.cogs);
+  const rel = potentialRelease(a);
   const s3: ReportItem[] = [
-    f(e != null && c.operatingCashFlow != null ? `Operating cash flow was ${e > 0 ? fmtPct(c.operatingCashFlow / e, 0) : "n/m"} of EBITDA: ${fmtM(e - c.operatingCashFlow)} of EBITDA did not arrive as operating cash.` : "Cash conversion could not be computed."),
-    ...(fcf != null ? [f(`Free cash flow ${fmtM(fcf)} after capex of ${fmtM(c.capex)}${fcf < 0 ? ": operating cash flow does not cover capex" : ""}.`)] : [miss("Capital expenditure not supplied: free cash flow can't be computed.")]),
     f(`Days: DSO ${fmtDays(pm?.dso ?? null)} → ${fmtDays(m.dso)}; DIO ${fmtDays(pm?.dio ?? null)} → ${fmtDays(m.dio)}; DPO ${fmtDays(pm?.dpo ?? null)} → ${fmtDays(m.dpo)}; cash conversion cycle ${fmtDays(pm?.ccc ?? null)} → ${fmtDays(m.ccc)}.`),
+    vs("dso", m.dso, "DSO"),
+    ctx.relevance("dio") === "na" ? miss(`Inventory days (DIO) are Not Applicable to ${ctx.name}.`) : vs("dio", m.dio, "DIO"),
+    vs("dpo", m.dpo, "DPO"),
+    vs("ccc", m.ccc, "Cash conversion cycle (diagnostic, not scored)"),
+    ...["dso", "dio", "dpo", "owc"].map(ind).filter((i) => i.applicable && i.points != null && (i.points ?? 0) > 0).map(line),
     ...(dsoTie != null && dsoTie > 0 ? [est(`Slower collections tie up about ${fmtM(dsoTie)} more cash than at last year's DSO.`)] : []),
     ...(dioTie != null && dioTie > 0 ? [est(`Slower stock turnover ties up about ${fmtM(dioTie)} more cash than at last year's DIO.`)] : []),
-    ...(dpoTie != null && dpoTie < 0 ? [est(`Faster supplier payment uses about ${fmtM(-dpoTie)} more cash than at last year's DPO.`)] : []),
-    ...[ind("owc"), ind("dso"), ind("dio"), ind("dpo")].filter((i) => i.points != null).map((i) => f(`${i.name}: ${i.actual} (${lvl(i)}).`)),
-    ...(ind("owc").points == null ? [miss("Operating working capital needs receivables, inventory and payables; the cash it absorbs can't be measured.")] : []),
-    ...(ind("res").points != null ? [est(`Stress case (revenue −10%, margin −3 pp, collections +15 days, interest +2 pp): ${ind("res").actual}. Illustrative, not a forecast.`)] : []),
-    ...(a.records.length < 4 ? [miss("Annual year-end balances can hide intra-year swings; monthly working capital would show seasonality.")] : []),
+    ...(rel.total != null && rel.total > 0 ? [est(`Returning DSO and DIO to FY${p?.year} levels would release about ${fmtM(rel.total)} (receivables ${fmtM(rel.receivables)}, inventory ${fmtM(rel.inventory)}). One-off cash, not guaranteed.`)] : []),
+    ...(sales != null && m.dso != null ? [est(`Cutting DSO by 15 days would release about ${fmtM(dayValue(sales) * Math.min(15, m.dso))}; each day of DSO is worth ${fmtM(dayValue(sales), 2)}.`)] : []),
+    ...(v.wcExcess != null && v.wcExcess > 0 ? [est(`Working capital is ${fmtM(v.wcExcess)} above last year's share of revenue: a possible normalised-working-capital (peg) discussion in the purchase agreement.`)] : []),
+    asm("Operational constraints: releases hold revenue and purchases constant, are one-off, and depend on customer terms, credit quality, stock mix and supplier agreements. Stretching payables can strain supplier relationships and is shown as an option, not a recommendation."),
+    ...(c.creditPurchases == null ? [asm("Annual purchases were not supplied, so DPO is measured on COGS.")] : []),
   ];
 
-  // ---- 4 cash release
-  const base = sales, d0 = m.dso;
+  // ---- 4 debt, liquidity and financial risk
   const s4: ReportItem[] = [
-    ...(base != null && d0 != null
-      ? [
-          ...[["Conservative", 8], ["Base", 15], ["Optimistic", 25]].map(([n, cut]) => est(`${n}: cutting DSO by ${cut} days (${fmtDays(d0)} → ${fmtDays(Math.max(0, d0 - (cut as number)))}) would release about ${fmtM(cashRelease(base, d0, Math.max(0, d0 - (cut as number))))}.`)),
-          ...(dsoTie != null && dsoTie > 0 ? [est(`Returning DSO to last year's level (${fmtDays(pm?.dso ?? null)}) would release about ${fmtM(dsoTie)}.`)] : []),
-        ]
-      : [miss("Cash release needs sales and DSO.")]),
-    ...(dioTie != null && dioTie > 0 ? [est(`Returning inventory days to last year's level would release about ${fmtM(dioTie)}.`)] : []),
-    ...(v.wcExcess != null && v.wcExcess > 0 ? [est(`Working capital is ${fmtM(v.wcExcess)} higher than at last year's share of revenue: a possible normalised-working-capital (peg) discussion in the purchase agreement.`)] : []),
-    asm("Releases are one-off, not recurring cash flow, and assume revenue stays constant. They are not guaranteed: achievability depends on customer terms, credit quality and stock mix."),
-    hyp("Collections discipline and revised credit terms could be a post-deal value-creation lever, if the drivers of the slowdown are fixable."),
+    f(c.debt != null && c.cash != null ? `Total debt ${fmtM(c.debt)}, cash ${fmtM(c.cash)}, net debt ${fmtM(c.debt - c.cash)}${lev != null ? `: ${fmtX(lev)} adjusted EBITDA` : ""}.` : "Debt and cash were not both supplied, so net debt cannot be computed."),
+    ctx.relevance("lev") === "na" ? miss(`Net debt / EBITDA is Not Applicable to ${ctx.name}.`) : vs("debtEbitda", lev, "Net debt / adjusted EBITDA (the benchmark is gross debt incl. leases, so this comparison is conservative)"),
+    ctx.relevance("int") === "na" ? miss(`Interest coverage is Not Applicable to ${ctx.name}.`) : vs("intCover", c.interestExpense && c.interestExpense > 0 && e != null ? e / c.interestExpense : null, "Interest coverage on EBITDA (the benchmark is EBIT-based, so the company figure runs higher)"),
+    ...["lev", "int", "dscr", "mat", "liqr"].map(ind).filter((i) => i.applicable).map(line),
+    ...(v.postLeverage != null ? [f(`Post-deal: net debt ${fmtM(v.postNetDebt)} (existing net debt + proposed acquisition debt − cash used) is ${fmtX(v.postLeverage)} adjusted EBITDA.`)] : [miss("No acquisition financing entered, so post-deal leverage is unavailable.")]),
+    ...(c.principalRepayment == null ? [miss("Scheduled principal repayment not supplied: debt service coverage and maturity risk are limited.")] : []),
   ];
 
-  // ---- 5 valuation & returns
-  const s5: ReportItem[] = a.inputs.enterpriseValue == null
-    ? [miss("No valuation inputs entered. Add the proposed enterprise value, equity and debt in Investment Risk Analysis → Valuation to see the entry multiple and returns."), f(`Adjusted EBITDA ${fmtM(v.adjustedEbitda)}; net debt ${fmtM(v.netDebt)}.`), asm("The risk score is deliberately not converted into an attractiveness score: price decides whether a risky company is attractive.")]
-    : [
-        f(`Proposed enterprise value ${fmtM(a.inputs.enterpriseValue)} = ${fmtX(v.entryMultiple, 1)} adjusted EBITDA${v.reportedMultiple != null && v.reportedMultiple !== v.entryMultiple ? ` (${fmtX(v.reportedMultiple, 1)} on reported)` : ""}.`),
-        f(`Implied equity value ${fmtM(v.equityValue)} (enterprise value less net debt ${fmtM(v.netDebt)}).`),
-        ...(v.normalisation ? [est(`Verified adjustments change EBITDA by ${fmtM(v.normalisation)}.`)] : [asm("Adjusted EBITDA equals reported EBITDA: no verified adjustments were entered.")]),
-        ...(v.entryLeverage != null ? [f(`Acquisition debt ${fmtM(v.acquisitionDebt)}${v.debtDerived ? " (derived as EV − equity)" : ""} = ${fmtX(v.entryLeverage)} adjusted EBITDA.`)] : []),
-        ...(v.fundingGap != null && Math.abs(v.fundingGap) > 0.05 ? [f(`Sources and uses differ by ${fmtM(Math.abs(v.fundingGap))}.`)] : []),
-        ...(v.returns ? [asm(`Illustrative return: ${v.returns.holdYears}-year hold, EBITDA ${v.returns.growth.toFixed(1)}% a year (${v.returns.growthSource}), exit at ${fmtX(v.returns.exitMultiple, 1)} (${v.returns.exitMultipleSource}) gives ${v.returns.moic.toFixed(2)}x MOIC and ${v.returns.irr.toFixed(0)}% IRR. Not a forecast; ignores financing costs and tax.`)] : [miss("Returns need enterprise value, equity invested and positive adjusted EBITDA.")]),
-        ...(risk.score != null && risk.score >= 50 ? [hyp("If the flagged cash-conversion issues are real, EBITDA-based pricing may overstate cash-generative capacity; a price or structure discussion could follow. To be tested, not concluded.")] : []),
-      ];
+  // ---- 5 stress and valuation
+  const base = runCase(a, BASE_CASE), down = runCase(a, DOWNSIDE_CASE), sev = runCase(a, SEVERE_CASE);
+  const fx = (o: typeof base) => `adjusted EBITDA ${fmtM(o.adjustedEbitda)}, operating cash flow ${fmtM(o.ocf)}, free cash flow ${fmtM(o.fcf)}, interest cover ${fmtX(o.interestCover, 1)}, net debt/EBITDA ${fmtX(o.netDebtToEbitda)}, DSCR ${fmtX(o.dscr)}, cash shortfall ${o.shortfall == null ? "—" : o.shortfall === 0 ? "none" : fmtM(o.shortfall)}`;
+  const vr = v.returns;
+  const rDown = vr ? scenarioReturns(a, vr.growth - 5, vr.holdYears, Math.max(0.5, vr.exitMultiple - 1), "scenario") : null;
+  const rUp = vr ? scenarioReturns(a, vr.growth + 3, vr.holdYears, vr.exitMultiple + 1, "scenario") : null;
+  const s5: ReportItem[] = [
+    asm("Scenario analysis only: hypothetical results built on the latest actual year, not forecasts. Assumptions are editable on the Stress Testing page."),
+    est(`Base case (FY${c.year} held constant): ${fx(base)}.`),
+    est(`Downside case (revenue −${DOWNSIDE_CASE.revenueDrop}%, margin −${DOWNSIDE_CASE.marginDrop} pp, DSO +${DOWNSIDE_CASE.dsoIncrease}d, DIO +${DOWNSIDE_CASE.dioIncrease}d, rates +${DOWNSIDE_CASE.interestRise} pp): ${fx(down)}.`),
+    est(`Severe stress case (revenue −${SEVERE_CASE.revenueDrop}%, margin −${SEVERE_CASE.marginDrop} pp, DSO +${SEVERE_CASE.dsoIncrease}d, DIO +${SEVERE_CASE.dioIncrease}d, rates +${SEVERE_CASE.interestRise} pp): ${fx(sev)}.`),
+    ...(sev.shortfall != null && sev.shortfall > 0 ? [est(`Under the severe case operating cash flow falls short of capex and scheduled principal by ${fmtM(sev.shortfall)}${sev.uncovered != null && sev.uncovered > 0 ? `, ${fmtM(sev.uncovered)} of it not covered by cash on hand` : ""}: external funding would be needed.`)] : []),
+    ...(v.enterpriseValue != null ? [f(`Proposed enterprise value ${fmtM(v.enterpriseValue)} = ${fmtX(v.entryMultiple, 1)} adjusted EBITDA; implied equity value ${fmtM(v.equityValue)} after existing net debt of ${fmtM(v.netDebt)}.`)] : [miss("No enterprise value or entry multiple entered, so entry valuation is unavailable.")]),
+    ...(vr ? [asm(`Illustrative base return: ${vr.holdYears}-year hold, EBITDA growth ${vr.growth.toFixed(1)}% a year, exit at ${fmtX(vr.exitMultiple, 1)} gives ${vr.moic.toFixed(2)}x MOIC and ${vr.irr.toFixed(0)}% IRR. Downside (growth −5 pp, exit −1.0x): ${rDown ? `${rDown.moic.toFixed(2)}x / ${rDown.irr.toFixed(0)}%` : "n/a"}; upside (growth +3 pp, exit +1.0x): ${rUp ? `${rUp.moic.toFixed(2)}x / ${rUp.irr.toFixed(0)}%` : "n/a"}. Not a forecast; ignores financing costs and tax.`)] : [miss("Returns need an enterprise value, equity invested and positive adjusted EBITDA.")]),
+    ...[...new Set([...down.notes, ...sev.notes])].map((n) => miss(n)),
+  ];
 
-  // ---- 6 risks & priorities
+  // ---- 6 red flags and actions
+  const flags: RedFlag[] = flagged.slice(0, 6).map((i) => ({
+    title: i.name,
+    level: levelName(i.level),
+    shows: `${i.actual}${i.previous !== "—" ? ` (prior: ${i.previous})` : ""}. ${i.explanation}${i.bench && i.bench.status !== "unavailable" ? ` Industry median ${i.bench.median}, typical range ${i.bench.range}.` : ""}`,
+    matters: WHY[i.id]?.why ?? "Weakens the reliability of the earnings or cash flow being acquired.",
+    implication: sizeImpact(a, i.id) ?? `Cannot be sized in ${cur()} from the supplied data.`,
+    investigate: [...(WHY[i.id]?.verify ?? []), ...i.questions.slice(0, 1)],
+  }));
+  const qs = [...flagged.flatMap((i) => i.questions), ...risk.categories.flatMap((k) => k.questions)].filter((q, k, arr) => arr.indexOf(q) === k).slice(0, 8);
+  const unass = inds.filter((i) => i.applicable && i.points == null);
   const s6: ReportItem[] = [
-    ...(flagged.length ? flagged.slice(0, 6).map((i, n) => f(`${n + 1}. ${i.name} — ${i.actual} (${lvl(i)}).`)) : [f("No indicator is rated High or Critical on the data supplied.")]),
-    ...flagged.slice(0, 3).map((i) => asm(`Verify ${i.name}: ${(findings.find((x) => x.id === i.id)?.verify ?? i.questions.slice(0, 2)).join("; ")}.`)),
-    ...inds.filter((i) => i.points == null).map((i) => miss(`${i.name} not assessed: needs ${i.requires.join(" and ").toLowerCase()}.`)),
-    miss(`Only ${a.records.length} annual periods and year-end balances: no quarterly, seasonal or intra-year data.`),
-    hyp("Every flagged item is a potential risk to investigate. None proves fraud, poor management or bad debt."),
+    flags.length ? f(`${flagged.length} applicable indicator${flagged.length > 1 ? "s are" : " is"} rated High or Critical; the ${flags.length} largest are set out below with what each shows, why it matters, its potential financial implication and what to verify.`) : f("No applicable indicator is rated High or Critical on the data supplied."),
+    hyp("Interpretation, not a calculated finding: every flagged item is a potential risk to investigate. None proves fraud, poor management or bad debt."),
+    ...unass.map((i) => miss(`${i.name}: Not Assessed. Needs ${i.requires.join(" and ").toLowerCase()}. Obtain this before relying on the score.`)),
+    ...(a.inputs.adjustmentStatus !== "verified" ? [miss("EBITDA adjustments are not verified, so adjusted EBITDA may differ from the figure a buyer would underwrite.")] : []),
+    miss(`Only ${a.records.length} annual period${a.records.length === 1 ? "" : "s"} and year-end balances: no quarterly, seasonal or intra-year data, and customer concentration, contract terms and one-off items cannot be assessed from statements alone.`),
+    asm("Recommended due diligence actions follow the order of risk points; the questions below ask for evidence and do not presume a finding."),
   ];
-  const qs = flagged.flatMap((i) => i.questions).filter((q, k, arr) => arr.indexOf(q) === k).slice(0, 8);
 
   return [
-    { id: "summary", title: "Executive Investment Summary", question: "Financial health: Is the company financially stable?", items: s1 },
-    { id: "earnings", title: "Financial Performance & Earnings Quality", question: "Earnings quality: Are reported profits sustainable?", items: s2, questions: qoe.questions },
-    { id: "cash", title: "Cash Flow & Working Capital Analysis", question: "Cash position: Where is the company's cash getting trapped?", items: s3, questions: [...risk.categories[1].questions, ...risk.categories[2].questions].slice(0, 5) },
-    { id: "release", title: "Cash Release & Value Creation Opportunities", question: "Value creation: How much cash could potentially be unlocked?", items: s4 },
-    { id: "valuation", title: "Valuation & Investment Returns", question: "Investment attractiveness: Does the valuation justify the expected returns?", items: s5 },
-    { id: "risks", title: "Investment Risks & Due Diligence Priorities", question: "Risk exposure: What should investors investigate before acquiring the company?", items: s6, questions: qs },
+    { id: "summary", title: "Executive Investment Assessment", question: "Is the target financially healthy relative to its industry, and what matters most?", items: s1 },
+    { id: "earnings", title: "Quality of Earnings and Cash Flow", question: "Are reported earnings supported by actual cash generation?", items: s2, questions: risk.categories[0].questions },
+    { id: "wc", title: "Working Capital and Cash Release Opportunities", question: "Where is cash trapped, and how much could potentially be released?", items: s3, questions: risk.categories[2].questions },
+    { id: "debt", title: "Debt, Liquidity and Financial Risk", question: "Can the company carry its debt and meet short-term obligations?", items: s4, questions: [...risk.categories[3].questions, ...risk.categories[4].questions].slice(0, 4) },
+    { id: "stress", title: "Acquisition Stress Test and Valuation", question: "How resilient is the company under stress, and what does the price imply?", items: s5 },
+    { id: "flags", title: "Critical Red Flags and Recommended Due Diligence Actions", question: "What should be verified before committing capital?", items: s6, flags, questions: qs },
   ];
 }

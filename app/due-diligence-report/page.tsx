@@ -1,13 +1,15 @@
 "use client";
 
+import { cur } from "@/lib/utilities/format";
 import clsx from "clsx";
 import { AnimatePresence, motion } from "framer-motion";
-import { BadgeCheck, ChevronDown, Download, FileText, Loader2, Printer, RefreshCw, Sparkles } from "lucide-react";
-import { useMemo, useState } from "react";
+import { BadgeCheck, ChevronDown, FileDown, FileText, Loader2, Printer, RefreshCw, Sparkles } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 import { RiskGauge } from "@/components/charts/RiskGauge";
 import { WithAnalysis } from "@/components/shared/Guard";
 import { Button, Card, PageTitle, Pill } from "@/components/shared/ui";
 import { buildReport, type ReportSection, type Tag } from "@/lib/calculations/narrative";
+import { downloadReportPdf } from "@/lib/utilities/pdf";
 import { useApp } from "@/lib/state/store";
 import type { AnalysisResult } from "@/types/finance";
 
@@ -20,21 +22,26 @@ const TAGS: Record<Tag, { label: string; cls: string }> = {
   estimate: { label: "Estimate", cls: "border-pos/30 bg-pos/10 text-pos" },
   assumption: { label: "Assumption", cls: "border-warn/30 bg-warn/10 text-warn" },
   missing: { label: "Missing data", cls: "border-crit/30 bg-crit/10 text-crit" },
-  hypothesis: { label: "Hypothesis", cls: "border-ai/30 bg-ai/10 text-ai" },
+  hypothesis: { label: "Interpretation", cls: "border-ai/30 bg-ai/10 text-ai" },
 };
-
-function toMarkdown(name: string, secs: ReportSection[]) {
-  return [`# Due Diligence Report: ${name}`, "_Decision-support output generated from deterministic calculations. Not investment advice. It does not recommend buying or rejecting the company._", ""]
-    .concat(secs.flatMap((s, i) => [`## ${i + 1}. ${s.title}`, `_${s.question}_`, "", ...s.items.map((it) => `- **[${TAGS[it.tag].label}]** ${it.text}`), ...(s.questions?.length ? ["", "Questions for management:", ...s.questions.map((q, k) => `${k + 1}. ${q}`)] : []), ""]))
-    .join("\n");
-}
 
 function Page({ a }: { a: AnalysisResult }) {
   const { active, toast } = useApp();
   const [phase, setPhase] = useState<"idle" | "gen" | "done">("idle");
   const [stamp, setStamp] = useState<Date | null>(null);
   const [open, setOpen] = useState<Set<string>>(new Set(["summary"]));
-  const secs = useMemo(() => buildReport(a), [a]);
+  const base = useMemo(() => buildReport(a), [a]);
+  const secs = base;
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const h = window.location.hash;
+    if (h.startsWith("#sec-") || h === "#pdf") {
+      setPhase("done"); setStamp(new Date()); setOpen(new Set(h.startsWith("#sec-") ? [h.slice(5)] : ["summary"]));
+      if (h.startsWith("#sec-")) setTimeout(() => document.getElementById(h.slice(1))?.scrollIntoView({ behavior: "smooth", block: "start" }), 400);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  const [pdfBusy, setPdfBusy] = useState(false);
   const complete = a.risk.coverage;
 
   const generate = () => {
@@ -43,9 +50,17 @@ function Page({ a }: { a: AnalysisResult }) {
   };
   const toggle = (id: string) => setOpen((o) => { const n = new Set(o); n.has(id) ? n.delete(id) : n.add(id); return n; });
   const jump = (id: string) => { setOpen((o) => new Set(o).add(id)); setTimeout(() => document.getElementById(`sec-${id}`)?.scrollIntoView({ behavior: "smooth", block: "start" }), 60); };
-  const download = () => {
-    const url = URL.createObjectURL(new Blob([toMarkdown(active.name, secs)], { type: "text/markdown" }));
-    const el = document.createElement("a"); el.href = url; el.download = `${active.name.replace(/\W+/g, "-")}-due-diligence.md`; el.click(); URL.revokeObjectURL(url);
+  const pdf = async () => {
+    setPdfBusy(true);
+    try {
+      await downloadReportPdf({
+        company: active.name, period: `FY${a.records[0].year}-FY${a.latestRecord.year}`,
+        generated: (stamp ?? new Date()).toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" }),
+        score: a.risk.score == null ? "Insufficient data" : `${a.risk.score}/100 (${a.risk.classification})`,
+        coverage: `${a.risk.coverage}%`, confidence: a.risk.confidence.level,
+      }, secs, `${active.name.replace(/\W+/g, "-")}-due-diligence.pdf`);
+      toast("PDF downloaded", "pos");
+    } catch { toast("Couldn't build the PDF", "crit"); } finally { setPdfBusy(false); }
   };
 
   return (
@@ -54,8 +69,8 @@ function Page({ a }: { a: AnalysisResult }) {
         phase === "done" && (
           <div className="flex flex-wrap gap-2">
             <Button variant="ghost" onClick={generate}><RefreshCw size={14} /> Regenerate</Button>
-            <Button variant="ghost" onClick={download}><Download size={14} /> Markdown</Button>
-            <Button onClick={() => window.print()}><Printer size={14} /> Print / Save PDF</Button>
+            <Button variant="ghost" onClick={() => window.print()}><Printer size={14} /> Print</Button>
+            <Button onClick={pdf} disabled={pdfBusy}>{pdfBusy ? <Loader2 size={14} className="animate-spin" /> : <FileDown size={14} />} Download PDF</Button>
           </div>
         )
       } />
@@ -66,10 +81,10 @@ function Page({ a }: { a: AnalysisResult }) {
             <Card className="mx-auto max-w-2xl text-center" hover={false}>
               <span className="mx-auto mb-5 grid h-14 w-14 place-items-center rounded-2xl border border-ai/30 bg-ai/10 text-ai">{phase === "gen" ? <Loader2 className="animate-spin" /> : <FileText />}</span>
               <h2 className="font-display text-xl font-semibold">{phase === "gen" ? "Composing report…" : `Report for ${active.name}`}</h2>
-              <p className="mx-auto mt-2 max-w-md text-[13.5px] text-ink2">Six sections, each answering an investor question, drawn only from calculated metrics. Facts, estimates, assumptions, missing data and hypotheses are labelled separately.</p>
+              <p className="mx-auto mt-2 max-w-md text-[13.5px] text-ink2">Six sections, each answering an investor question, drawn only from the uploaded data, the calculated outputs and the selected industry's benchmarks. Calculated findings (Fact, Estimate) are labelled apart from assumptions and interpretations. </p>
               {phase === "gen" ? (
                 <ul className="mx-auto mt-5 max-w-xs space-y-1.5 text-left font-mono text-[11.5px] text-ink2">
-                  {["Collecting calculated metrics", "Ranking risks by materiality", "Quantifying impact in AED", "Labelling facts, estimates and hypotheses"].map((t, i) => <motion.li key={t} initial={{ opacity: 0.2 }} animate={{ opacity: 1 }} transition={{ delay: i * 0.45 }} className="flex gap-2"><BadgeCheck size={14} className="text-ai" />{t}</motion.li>)}
+                  {["Collecting calculated metrics", "Ranking risks by materiality", `Quantifying impact in ${cur()}`, "Labelling facts, estimates and hypotheses"].map((t, i) => <motion.li key={t} initial={{ opacity: 0.2 }} animate={{ opacity: 1 }} transition={{ delay: i * 0.45 }} className="flex gap-2"><BadgeCheck size={14} className="text-ai" />{t}</motion.li>)}
                 </ul>
               ) : <Button variant="ai" className="mt-6" onClick={generate}><Sparkles size={15} /> Generate report</Button>}
               <p className="mt-5 font-mono text-[10.5px] text-ink3">AI model not configured · output uses deterministic templates.</p>
@@ -81,12 +96,13 @@ function Page({ a }: { a: AnalysisResult }) {
             <Card className="mb-5" hover={false}>
               <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
                 <div>
-                  {/* <div className="mb-2 flex flex-wrap gap-2"><Pill tone="ai"><Sparkles size={11} /> Deterministic demo report</Pill>{active.synthetic && <Pill tone="warn">Synthetic data</Pill>}</div> */}
+                  
                   <h2 className="font-display text-[24px] font-semibold">{active.name}</h2>
                   <div className="mt-2 flex flex-wrap gap-x-6 gap-y-1 font-mono text-[11.5px] text-ink2">
                     <span><span className="text-ink3">PERIOD </span>FY{a.records[0].year}–FY{a.latestRecord.year}</span>
                     <span><span className="text-ink3">GENERATED </span>{stamp?.toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" })}</span>
                     <span><span className="text-ink3">MODEL COVERAGE </span>{complete}%</span>
+                    <span><span className="text-ink3">CONFIDENCE </span>{a.risk.confidence.level}</span>
                   </div>
                 </div>
                 <div className="flex items-center gap-5 rounded-2xl border border-line bg-bg2 p-4">
@@ -129,17 +145,24 @@ function Page({ a }: { a: AnalysisResult }) {
                             </li>
                           ))}
                         </ul>
-                        {s.questions && s.questions.length > 0 && (
-                          <div className="rounded-xl border border-line bg-bg2 p-4">
-                            <div className="mb-2 font-mono text-[10px] uppercase tracking-wider text-ink3">Questions for management</div>
-                            <ol className="list-decimal space-y-1.5 pl-5 text-[13px] text-ink2">{s.questions.map((q) => <li key={q}>{q}</li>)}</ol>
+                        {s.flags && s.flags.length > 0 && (
+                          <div className="space-y-3">
+                            {s.flags.map((fl, n) => (
+                              <div key={fl.title} className="rounded-xl border border-line bg-bg2 p-4">
+                                <div className="mb-3 flex items-center justify-between gap-3"><span className="font-display text-[14px] font-medium"><span className="mr-2 font-mono text-[11px] text-ink3">{n + 1}.</span>{fl.title}</span><span className={clsx("rounded-md border px-2 py-0.5 font-mono text-[10px] uppercase", fl.level === "Critical" ? "border-crit/30 bg-crit/10 text-crit" : "border-warn/30 bg-warn/10 text-warn")}>{fl.level}</span></div>
+                                <dl className="grid gap-3 text-[12.5px] leading-relaxed md:grid-cols-2">
+                                  {([["What the indicator shows", fl.shows], ["Why it matters to a PE investor", fl.matters], ["Potential financial implication", fl.implication], ["What to investigate", fl.investigate.join(" · ")]] as const).map(([k, t]) => <div key={k}><dt className="font-mono text-[10px] uppercase tracking-wider text-ink3">{k}</dt><dd className="mt-1 text-ink2">{t}</dd></div>)}
+                                </dl>
+                              </div>
+                            ))}
                           </div>
                         )}
+
                       </div>
                     </section>
                   ))}
                 </div>
-                <p className="mt-5 text-[11.5px] leading-relaxed text-ink3">Decision support only. This report presents the financial evidence and its investment implications; it does not recommend buying or rejecting the company, which is for the investor to decide, and it does not replace professional due diligence. {active.synthetic && "All figures are synthetic."}</p>
+                <p className="mt-5 text-[11.5px] leading-relaxed text-ink3">Decision support only. This report presents the financial evidence and its investment implications; it does not recommend buying or rejecting the company, which is for the investor to decide, and it does not replace professional due diligence.</p>
               </div>
             </div>
           </motion.div>
