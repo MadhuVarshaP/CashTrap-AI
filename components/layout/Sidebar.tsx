@@ -5,7 +5,8 @@ import { motion } from "framer-motion";
 import { ChevronDown, ChevronsLeft, ChevronsRight, HelpCircle } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { useAutoCollapse } from "@/lib/utilities/useAutoCollapse";
 import { LogoMark, Wordmark } from "./Logo";
 import { GROUPS, groupFor } from "./nav";
 
@@ -13,8 +14,9 @@ export function Sidebar() {
   const path = usePathname();
   const [open, setOpen] = useState(true);
   const current = groupFor(path)?.id;
-  const [openGroup, setOpenGroup] = useState<string | null>(current ?? "overview");
-  useEffect(() => { if (current) setOpenGroup(current); }, [current]);
+  // collapsed to begin with; opens when a category is chosen and settles back after a while
+  const [openGroup, setOpenGroup] = useState<string | null>(null);
+  useAutoCollapse(openGroup !== null, () => setOpenGroup(null), 20000);
   return (
     <aside className={clsx("sticky top-0 z-30 hidden h-screen shrink-0 flex-col border-r border-line bg-bg2 py-5 transition-[width] duration-300 lg:flex print:hidden", open ? "w-[260px] px-4" : "w-[84px] items-center px-3")}>
       <Link href="/company-analysis" className={clsx("mb-8 flex items-center gap-3", !open && "justify-center")} aria-label="CashCop AI home">
@@ -24,16 +26,16 @@ export function Sidebar() {
       <nav className="flex w-full flex-1 flex-col gap-1.5 overflow-y-auto" aria-label="Primary">
         {GROUPS.map((g) => {
           const active = current === g.id;
-          const expanded = open && openGroup === g.id;
+          const expanded = open && openGroup === g.id && g.items.length > 0;
           return (
             <div key={g.id}>
-              <Link href={g.href} title={g.label} onClick={(e) => { if (open) { if (openGroup === g.id && active) e.preventDefault(); setOpenGroup(openGroup === g.id && active ? null : g.id); } }} aria-expanded={open ? expanded : undefined}
+              <Link href={g.href} title={g.label} onClick={(e) => { if (open && g.items.length) { if (openGroup === g.id) { e.preventDefault(); setOpenGroup(null); } else setOpenGroup(g.id); } }} aria-expanded={open ? expanded : undefined}
                 className={clsx("group relative flex h-11 items-center gap-3 rounded-xl text-[13px] transition-colors", open ? "px-3" : "justify-center", active ? "text-ink" : "text-ink3 hover:bg-card hover:text-ink2")}>
                 {active && <motion.span layoutId="nav-active" className="absolute inset-0 rounded-xl border border-line bg-elev" transition={{ type: "spring", stiffness: 420, damping: 36 }} />}
                 {active && <motion.span layoutId="nav-bar" className="absolute -left-3 top-2.5 h-6 w-[3px] rounded-r bg-accent" />}
                 <g.icon size={19} className={clsx("relative shrink-0", active && "text-accent")} />
                 {open && <span className="relative flex-1 truncate font-medium">{g.label}</span>}
-                {open && <ChevronDown size={15} className={clsx("relative text-ink3 transition-transform", expanded && "rotate-180")} />}
+                {open && g.items.length > 0 && <ChevronDown size={15} className={clsx("relative text-ink3 transition-transform", expanded && "rotate-180")} />}
               </Link>
               {expanded && (
                 <ul className="mb-1 ml-[22px] mt-1 space-y-0.5 border-l border-line pl-3">
@@ -69,7 +71,7 @@ export function SubNav() {
   const g = groupFor(path);
   if (!g || g.tabs.length < 2) return null;
   return (
-    <div role="tablist" aria-label={g.label} className="print:hidden -mx-4 mb-6 flex gap-1.5 overflow-x-auto px-4 sm:mx-0 sm:px-0">
+    <div role="tablist" aria-label={g.label} className="print:hidden -mx-4 mb-6 flex lg:hidden gap-1.5 overflow-x-auto px-4 sm:mx-0 sm:px-0">
       <span className="mr-1 hidden shrink-0 items-center font-mono text-[10px] uppercase tracking-wider text-ink3 sm:flex">{g.label}</span>
       {g.tabs.map((t) => {
         const on = path === t.href;
