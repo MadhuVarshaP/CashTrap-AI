@@ -5,19 +5,27 @@ import { AnimatePresence, motion } from "framer-motion";
 import { AlertTriangle, ArrowUpDown, CheckCircle2, Download, History, Loader2, Play, Search, Database, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useMemo, useState } from "react";
+import { IndustryProfile } from "@/components/risk/IndustryProfile";
 import { Dropzone } from "@/components/shared/Dropzone";
 import { Bar, Button, Card, CardHead, PageTitle, Pill } from "@/components/shared/ui";
 import { analyze } from "@/lib/calculations/analyze";
 import { useApp } from "@/lib/state/store";
 import { REQUIRED_COLUMNS, SAMPLE_CSV, dataQuality } from "@/lib/utilities/parse";
+import { missingFieldReport, validateRecords } from "@/lib/utilities/validate";
 import type { FieldKey, FinancialRecord } from "@/types/finance";
 
-const COLS: { key: keyof FinancialRecord; label: string }[] = [
+const BASE_COLS: { key: keyof FinancialRecord; label: string }[] = [
   { key: "year", label: "Year" }, { key: "revenue", label: "Revenue" }, { key: "cogs", label: "COGS" }, { key: "ebitda", label: "EBITDA" },
   { key: "receivables", label: "Receivables" }, { key: "inventory", label: "Inventory" }, { key: "payables", label: "Payables" },
   { key: "operatingCashFlow", label: "Op. Cash Flow" }, { key: "cash", label: "Cash" }, { key: "debt", label: "Debt" },
 ];
-const UNITS = [{ label: "AED", v: 1 }, { label: "AED thousands", v: 1_000 }, { label: "AED millions", v: 1_000_000 }];
+const OPT_COLS: { key: keyof FinancialRecord; label: string }[] = [
+  { key: "ebitdaAdjustment", label: "EBITDA Adj." }, { key: "capex", label: "Capex" }, { key: "cashTaxes", label: "Cash Taxes" }, { key: "interestExpense", label: "Cash Interest" },
+  { key: "principalRepayment", label: "Sched. Principal" }, { key: "shortTermDebt", label: "Debt < 12m" }, { key: "currentAssets", label: "Current Assets" }, { key: "currentLiabilities", label: "Current Liab." },
+  { key: "creditSales", label: "Credit Sales" }, { key: "creditPurchases", label: "Purchases" },
+];
+const COLS = [...BASE_COLS, ...OPT_COLS];
+const unitsFor = (c: string) => [{ label: c, v: 1 }, { label: `${c} thousands`, v: 1_000 }, { label: `${c} millions`, v: 1_000_000 }];
 
 export default function CompanyAnalysis() {
   const { active, hasCompany, loadDemo, datasets, notify, addDataset, updateDataset, setActive, deleteDataset, history, removeHistory, clearHistory, runAnalysis, status, error, analysis, toast } = useApp();
@@ -41,33 +49,36 @@ export default function CompanyAnalysis() {
   const preview = useMemo(() => analyze(active), [active]);
   const label = (k: string) => COLS.find((c) => c.key === k)?.label ?? k;
   const gaps = Object.entries(dq.missing.reduce<Record<string, number[]>>((m, x) => ((m[x.field] ??= []).push(x.year), m), {}));
-  const off = preview?.risk.categories.flatMap((c) => c.indicators).filter((i) => i.points == null) ?? [];
+  const off = preview?.risk.categories.flatMap((c) => c.indicators).filter((i) => i.points == null && i.applicable) ?? [];
+  const baseIssues = useMemo(() => validateRecords(active.records), [active.records]);
+  const fieldReport = useMemo(() => missingFieldReport(active.records), [active.records]);
+  const issues = [...baseIssues, ...(active.fileCurrency && active.inputs?.currency && active.fileCurrency !== active.inputs.currency ? [{ level: "warning" as const, text: `Currency inconsistency: the file states ${active.fileCurrency} but the reporting currency is set to ${active.inputs.currency}. Figures are not converted.` }] : [])];
+  const errs = issues.filter((i) => i.level === "error");
   const warnings: string[] = [];
   if (dq.missing.length) warnings.push(`${dq.missing.length} missing value${dq.missing.length > 1 ? "s" : ""}: dependent indicators will be marked unavailable, not zero.`);
-  if (active.records.length < 2) warnings.push("At least two years are needed to assess trends.");
-  if (active.records.length < 3) warnings.push("Fewer than three years limits trend reliability.");
-  if (active.records.some((r) => r.ebitda != null && r.ebitda <= 0)) warnings.push("Non-positive EBITDA: cash conversion and leverage ratios are not meaningful for those years.");
   if (active.records[0] && !active.records[0].opening && active.records[0].reportedDso == null) warnings.push("First-year DSO/DIO/DPO use closing balances only unless opening balances were supplied.");
-  const ready = active.records.length >= 2;
+  const ready = active.records.length >= 2 && errs.length === 0;
 
   return (
     <>
-      {/* <PageTitle title="Company Analysis" sub="Upload financial statements, validate the records, then run the analysis." right={<Pill tone={active.synthetic ? "warn" : "accent"}>{active.synthetic ? "" : "Uploaded data"}</Pill>} /> */}
 
+      {hasCompany && <IndustryProfile />}
       <div className="grid gap-5 xl:grid-cols-12">
         <Card className={hasCompany ? "xl:col-span-7" : "xl:col-span-12"}>
           <CardHead title="Upload financial records" hint="Columns are matched by name; common aliases (Sales, OCF, Total Debt…) are recognised. Blank cells are treated as missing, never zero." />
           <Dropzone onError={(errs, file) => notify({ title: `Couldn't read ${file.name}`, body: errs[0], tone: "crit" })} onParsed={(records, file, meta, warns) => {
-            addDataset({ id: `upload-${Date.now()}`, name: meta?.name ?? file.name.replace(/\.[^.]+$/, ""), industry: "Uploaded company", synthetic: !!meta?.synthetic, records, unitMultiplier: meta?.unitMultiplier ?? 1_000_000, fileName: file.name, fileSize: file.size });
+            addDataset({ id: `upload-${Date.now()}`, name: meta?.name ?? file.name.replace(/\.[^.]+$/, ""), industry: "Uploaded company", synthetic: !!meta?.synthetic, records, unitMultiplier: meta?.unitMultiplier ?? 1_000_000, fileName: file.name, fileSize: file.size, fileCurrency: meta?.currency, inputs: meta?.currency ? { currency: meta.currency, frequency: "Annual" } : { currency: "AED", frequency: "Annual" } });
             notify({ title: `Uploaded ${meta?.name ?? file.name}`, body: `${records.length} years loaded${warns?.length ? ` · ${warns.length} data warning${warns.length > 1 ? "s" : ""}` : ""}. Run the analysis next.`, tone: warns?.length ? "warn" : "pos", href: "/company-analysis" });
           }} />
           <div className="mt-4 flex flex-wrap items-center gap-3">
-            <Button variant="ghost" onClick={() => { loadDemo(); toast("Loaded GulfTech demo data (synthetic)", "warn"); }}><Database size={15} /> Explore with GulfTech Demo Data</Button>
+            <Button variant="ghost" onClick={() => { loadDemo(); toast("Loaded the GulfTech sample company", "info"); }}><Database size={15} /> Explore with GulfTech Demo Data</Button>
             <a download="cashcop-ai-template.csv" href={`data:text/csv;charset=utf-8,${encodeURIComponent(SAMPLE_CSV)}`} className="inline-flex items-center gap-2 text-[12.5px] text-ink2 hover:text-ink"><Download size={14} /> Download CSV template</a>
           </div>
           <div className="mt-5 border-t border-line pt-4">
-            <div className="mb-2 font-mono text-[10px] uppercase tracking-wider text-ink3">Expected columns</div>
+            <div className="mb-2 font-mono text-[10px] uppercase tracking-wider text-ink3">Required columns (three or more years recommended)</div>
             <div className="flex flex-wrap gap-1.5">{REQUIRED_COLUMNS.map((c) => <span key={c} className="rounded-md border border-line bg-bg2 px-2 py-1 font-mono text-[10.5px] text-ink2">{c}</span>)}</div>
+            <div className="mb-2 mt-4 font-mono text-[10px] uppercase tracking-wider text-ink3">Optional columns: unlock the bridge, coverage and liquidity checks</div>
+            <div className="flex flex-wrap gap-1.5">{["EBITDA_Adjustments", "Capex", "Cash_Taxes", "Cash_Interest", "Current_Assets", "Current_Liabilities", "Scheduled_Principal", "Annual_Purchases", "Credit_Sales"].map((c) => <span key={c} className="rounded-md border border-dashed border-line px-2 py-1 font-mono text-[10.5px] text-ink3">{c}</span>)}</div>
           </div>
         </Card>
 
@@ -81,9 +92,28 @@ export default function CompanyAnalysis() {
             </div>
             <Bar value={dq.completeness * 100} max={100} color={dq.completeness === 1 ? "#35C994" : "#F5A640"} className="mt-4" />
             <ul className="mt-4 space-y-2">
+              {issues.filter((i) => i.level === "error").map((i) => <li key={i.text} className="flex gap-2 text-[12.5px] text-crit"><AlertTriangle size={14} className="mt-0.5 shrink-0" />{i.text}</li>)}
+              {issues.filter((i) => i.level === "warning").map((i) => <li key={i.text} className="flex gap-2 text-[12.5px] text-warn"><AlertTriangle size={14} className="mt-0.5 shrink-0" />{i.text}</li>)}
               {warnings.map((w) => <li key={w} className="flex gap-2 text-[12.5px] text-warn"><AlertTriangle size={14} className="mt-0.5 shrink-0" />{w}</li>)}
-              {warnings.length === 0 && <li className="flex gap-2 text-[12.5px] text-pos"><CheckCircle2 size={14} className="mt-0.5 shrink-0" />No validation warnings.</li>}
+              {warnings.length === 0 && issues.length === 0 && <li className="flex gap-2 text-[12.5px] text-pos"><CheckCircle2 size={14} className="mt-0.5 shrink-0" />No validation warnings.</li>}
             </ul>
+            {errs.length > 0 && <p role="alert" className="mt-3 rounded-xl border border-crit/30 bg-crit/5 p-3 text-[12.5px] text-crit">The analysis can&apos;t run until these errors are fixed. Correct the values in the table below (or the file&apos;s units) and they re-validate immediately.</p>}
+            <div className="mt-4 rounded-xl border border-line bg-bg2 p-3.5 text-[12.5px]">
+              <div className="mb-2 font-mono text-[10px] uppercase tracking-wider text-ink3">Field coverage</div>
+              <div className="space-y-2.5">
+                {fieldReport.map((g) => (
+                  <div key={g.group}>
+                    <div className="mb-1 text-[11.5px] text-ink2">{g.group}</div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {g.present.map((n) => <span key={n} className="rounded-md border border-pos/25 bg-pos/5 px-1.5 py-0.5 font-mono text-[10px] text-pos">{n}</span>)}
+                      {g.partial.map((n) => <span key={n} className="rounded-md border border-warn/30 bg-warn/5 px-1.5 py-0.5 font-mono text-[10px] text-warn">{n} · some years</span>)}
+                      {g.missing.map((n) => <span key={n} className="rounded-md border border-line px-1.5 py-0.5 font-mono text-[10px] text-ink3">{n} · not supplied</span>)}
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <p className="mt-2.5 text-[11px] text-ink3">Anything not supplied stays “not supplied”: it is never replaced with zero, and the indicators that need it read Not Assessed.</p>
+            </div>
             {gaps.length > 0 && (
               <div className="mt-4 rounded-xl border border-warn/25 bg-warn/5 p-3.5 text-[12.5px]">
                 <div className="mb-2 font-mono text-[10px] uppercase tracking-wider text-warn">What is missing</div>
@@ -103,7 +133,7 @@ export default function CompanyAnalysis() {
             {(!active.synthetic || active.fileName) && (
               <label className="mt-4 flex items-center justify-between gap-3 text-[12.5px] text-ink2">Values are in
                 <select value={active.unitMultiplier} onChange={(e) => updateDataset({ ...active, unitMultiplier: Number(e.target.value) })} className="rounded-lg border border-line bg-elev px-2.5 py-2 text-ink">
-                  {UNITS.map((u) => <option key={u.v} value={u.v}>{u.label}</option>)}
+                  {unitsFor(active.inputs?.currency ?? "AED").map((u) => <option key={u.v} value={u.v}>{u.label}</option>)}
                 </select>
               </label>
             )}
@@ -139,7 +169,7 @@ export default function CompanyAnalysis() {
           } /></div>
           {/* desktop / tablet table */}
           <div className="hidden overflow-x-auto md:block">
-            <table className="w-full min-w-[860px] text-[12.5px]">
+            <table className="w-full min-w-[1700px] text-[12.5px]">
               <thead><tr className="border-y border-line bg-bg2">
                 {COLS.map((c) => (
                   <th key={c.key} className="px-4 py-3 text-left font-mono text-[10.5px] font-medium uppercase tracking-wider text-ink3 first:pl-6">
@@ -159,7 +189,7 @@ export default function CompanyAnalysis() {
                     ))}
                   </tr>
                 ))}
-                {rows.length === 0 && <tr><td colSpan={10} className="px-6 py-8 text-center text-ink3">No matching records.</td></tr>}
+                {rows.length === 0 && <tr><td colSpan={COLS.length} className="px-6 py-8 text-center text-ink3">No matching records.</td></tr>}
               </tbody>
             </table>
           </div>
@@ -169,7 +199,7 @@ export default function CompanyAnalysis() {
               <div key={r.year} className="rounded-xl border border-line bg-bg2 p-4">
                 <div className="mb-3 font-display text-[18px] font-semibold">FY{r.year}</div>
                 <dl className="grid grid-cols-2 gap-x-4 gap-y-2.5">
-                  {COLS.slice(1).map((c) => <div key={c.key}><dt className="font-mono text-[10px] uppercase text-ink3">{c.label}</dt><dd className={clsx("font-mono text-[13px] tabular-nums", r[c.key] == null && "text-warn")}>{r[c.key] == null ? "missing" : String(r[c.key])}</dd></div>)}
+                  {BASE_COLS.slice(1).map((c) => <div key={c.key}><dt className="font-mono text-[10px] uppercase text-ink3">{c.label}</dt><dd className={clsx("font-mono text-[13px] tabular-nums", r[c.key] == null && "text-warn")}>{r[c.key] == null ? "missing" : String(r[c.key])}</dd></div>)}
                 </dl>
               </div>
             ))}
