@@ -5,7 +5,7 @@ import { detectAlerts } from "./alerts";
 
 const FIELDS: FieldKey[] = ["revenue", "cogs", "ebitda", "receivables", "inventory", "payables", "operatingCashFlow", "cash", "debt"];
 
-const MONEY_OPTIONAL = ["capex", "interestExpense", "currentAssets", "currentLiabilities", "principalRepayment", "shortTermDebt"] as const;
+const MONEY_OPTIONAL = ["capex", "interestExpense", "currentAssets", "currentLiabilities", "principalRepayment", "shortTermDebt", "ebitdaAdjustment", "cashTaxes"] as const;
 
 export function scaleRecords(rs: FinancialRecord[], multiplier: number): FinancialRecord[] {
   const k = multiplier / 1_000_000;

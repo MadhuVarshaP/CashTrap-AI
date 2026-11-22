@@ -1,6 +1,9 @@
 import type { AssessmentInputs, Classification, FinancialRecord, Indicator, Num, RiskCategory, RiskResult, Severity, YearMetrics } from "@/types/finance";
 import { DASH, fmtDays, fmtM, fmtPct, fmtX } from "@/lib/utilities/format";
 import { DEFAULT_STRESS, runStress } from "./stress";
+import { benchmarks, resolveThresholds } from "./thresholds";
+import { INDICATOR_METRIC, METRIC, benchRange, fmtBench, resolveIndustry } from "@/lib/benchmarks/resolve";
+import type { IndId } from "@/lib/benchmarks/industries";
 
 /**
  * Investment Risk Analysis engine: five pillars, 17 indicators, 100 points.
@@ -18,7 +21,7 @@ export const PILLARS = [
 
 /** share of an indicator's maximum awarded at each risk level */
 export const LEVEL_SHARE: Record<Severity, number> = { Low: 0, Medium: 0.4, High: 0.7, Critical: 1 };
-export const levelName = (s: Severity | null) => (s == null ? "Not assessed" : s === "Medium" ? "Moderate" : s);
+export const levelName = (s: Severity | null) => (s == null ? "Not Assessed" : s === "Medium" ? "Moderate" : s);
 
 /** an overall score needs at least this share of the 100 points to be assessable */
 export const MIN_COVERAGE = 40;
@@ -48,13 +51,20 @@ const pc = (v: Num, d = 1) => (v == null ? DASH : `${v.toFixed(d)}%`);
 interface Def { id: string; pillar: string; name: string; max: number; questions: string[] }
 
 /** reported EBITDA, plus the adjustment only when it is marked verified (latest year only) */
+export function adjustmentAmount(r: FinancialRecord, inputs: AssessmentInputs, latest: boolean): Num {
+  return (latest ? inputs.ebitdaAdjustment ?? r.ebitdaAdjustment : r.ebitdaAdjustment) ?? null;
+}
 export function adjustedEbitda(r: FinancialRecord, inputs: AssessmentInputs, latest: boolean): Num {
   if (r.ebitda == null) return null;
-  return latest && inputs.adjustmentStatus === "verified" && inputs.ebitdaAdjustment != null ? r.ebitda + inputs.ebitdaAdjustment : r.ebitda;
+  const adj = adjustmentAmount(r, inputs, latest);
+  return inputs.adjustmentStatus === "verified" && adj != null ? r.ebitda + adj : r.ebitda;
 }
 
 export function assessRisk(records: FinancialRecord[], metrics: YearMetrics[], inputs: AssessmentInputs = {}): RiskResult {
   const n = records.length;
+  const { cuts: T } = resolveThresholds(inputs);
+  const ctx = resolveIndustry(inputs);
+  const B = benchmarks(T);
   const at = (k: number) => records[n - 1 - k] as FinancialRecord | undefined; // k=0 latest
   const mt = (k: number) => metrics[n - 1 - k] as YearMetrics | undefined;
   const c = at(0)!, p = at(1);
@@ -87,13 +97,14 @@ export function assessRisk(records: FinancialRecord[], metrics: YearMetrics[], i
       id: d.id, pillar: d.pillar, name: d.name, max: d.max, level,
       points: level == null ? null : Math.round(d.max * LEVEL_SHARE[level] * 10) / 10,
       actual, previous, benchmark, explanation, requires, questions: d.questions,
+      applicable: true, relevance: ctx.relevance(d.id as IndId), bench: null,
     });
   const na = (d: Def, why: string, requires: string[], benchmark = "—") => add(d, null, DASH, DASH, benchmark, why, requires);
 
   // ---------------------------------------------------------------- Quality of earnings (25)
   {
     const d: Def = { id: "adj", pillar: "qoe", name: "EBITDA adjustments and unusual earnings", max: 10, questions: ["Provide the bridge from reported to adjusted EBITDA, line by line, with supporting documents.", "Which adjustments are one-off and which have recurred in prior years?", "Who approved each adjustment and has it been reviewed by an independent adviser?"] };
-    const adj = inputs.ebitdaAdjustment, st = inputs.adjustmentStatus;
+    const adj = adjustmentAmount(c, inputs, true), st = inputs.adjustmentStatus;
     if (adj == null || !st) na(d, "No EBITDA adjustment has been entered. Enter the adjustment and how well it is documented in the Quality of Earnings tab. Adjusted EBITDA is taken as equal to reported EBITDA until then.", ["EBITDA adjustment amount", "Adjustment support status"], "Verified → Low · needs documents → Moderate · unsupported → High · unexplained → Critical");
     else {
       const share = c.ebitda ? (Math.abs(adj) / Math.abs(c.ebitda)) * 100 : null;
@@ -115,10 +126,10 @@ export function assessRisk(records: FinancialRecord[], metrics: YearMetrics[], i
   {
     const d: Def = { id: "margin", pillar: "qoe", name: "EBITDA margin deterioration", max: 5, questions: ["What drove the change in EBITDA margin: price, mix, input costs or overheads?", "Is the current margin sustainable?"] };
     const mC = margin(0), mP = margin(1);
-    if (mC == null || mP == null) na(d, "Needs revenue and EBITDA for two consecutive years.", ["Revenue", "EBITDA"], "Change in margin: ≥ −0.5 pp Low · ≥ −2 Moderate · ≥ −5 High · below Critical");
+    if (mC == null || mP == null) na(d, "Needs revenue and EBITDA for two consecutive years.", ["Revenue", "EBITDA"], B.margin);
     else {
       const dm = (mC - mP) * 100;
-      add(d, down(dm, [-0.5, -2, -5]), `${pc(mC * 100)} (${pp(dm)})`, pc(mP * 100), "Change in margin: ≥ −0.5 pp Low · ≥ −2 Moderate · ≥ −5 High · below Critical", dm < -0.5 ? "EBITDA margin has fallen: profit is growing more slowly than revenue." : "EBITDA margin is stable or improving.");
+      add(d, down(dm, T.margin), `${pc(mC * 100)} (${pp(dm)})`, pc(mP * 100), B.margin, dm < -0.5 ? "EBITDA margin has fallen: profit is growing more slowly than revenue." : "EBITDA margin is stable or improving.");
     }
   }
   {
@@ -139,27 +150,27 @@ export function assessRisk(records: FinancialRecord[], metrics: YearMetrics[], i
   {
     const d: Def = { id: "ocf", pillar: "cash", name: "EBITDA-to-operating-cash conversion", max: 10, questions: ["Reconcile EBITDA to operating cash flow for each of the last three years.", "How much of the gap is working capital, tax, interest or one-off items?"] };
     const e = eAdj(0);
-    if (e == null || c.operatingCashFlow == null) na(d, "Needs EBITDA and operating cash flow.", ["EBITDA", "Operating cash flow"], "OCF ÷ adjusted EBITDA: ≥ 80% Low · ≥ 50% Moderate · ≥ 20% High · below or negative Critical");
-    else if (e <= 0) add(d, "Critical", `EBITDA ${fmtM(e)}, OCF ${fmtM(c.operatingCashFlow)}`, DASH, "OCF ÷ adjusted EBITDA: ≥ 80% Low · ≥ 50% Moderate · ≥ 20% High · below or negative Critical", "EBITDA is not positive, so earnings are not turning into cash by definition.");
+    if (e == null || c.operatingCashFlow == null) na(d, "Needs EBITDA and operating cash flow.", ["EBITDA", "Operating cash flow"], B.ocf);
+    else if (e <= 0) add(d, "Critical", `EBITDA ${fmtM(e)}, OCF ${fmtM(c.operatingCashFlow)}`, DASH, B.ocf, "EBITDA is not positive, so earnings are not turning into cash by definition.");
     else {
       const v = ocfConv(0)! * 100;
-      add(d, down(v, [80, 50, 20]), `${pc(v)} (OCF ${fmtM(c.operatingCashFlow)} ÷ EBITDA ${fmtM(e)})`, pc(ocfConv(1) == null ? null : ocfConv(1)! * 100), "OCF ÷ adjusted EBITDA: ≥ 80% Low · ≥ 50% Moderate · ≥ 20% High · below or negative Critical", v >= 80 ? "Most reported EBITDA is converting to operating cash." : "A material share of reported EBITDA is not arriving as operating cash.");
+      add(d, down(v, T.ocf), `${pc(v)} (OCF ${fmtM(c.operatingCashFlow)} ÷ EBITDA ${fmtM(e)})`, pc(ocfConv(1) == null ? null : ocfConv(1)! * 100), B.ocf, v >= 80 ? "Most reported EBITDA is converting to operating cash." : "A material share of reported EBITDA is not arriving as operating cash.");
     }
   }
   {
     const d: Def = { id: "fcf", pillar: "cash", name: "Free cash flow conversion", max: 10, questions: ["Split capex into maintenance and growth.", "Is operating cash flow sufficient to fund capex without new borrowing?"] };
     const e = eAdj(0), f = fcf(0);
-    if (e == null || f == null) na(d, "Needs operating cash flow and capital expenditure.", ["Capital expenditure"], "FCF ÷ adjusted EBITDA: ≥ 50% Low · ≥ 25% Moderate · ≥ 0% High · negative Critical");
-    else if (e <= 0) add(d, "Critical", `FCF ${fmtM(f)} on EBITDA ${fmtM(e)}`, DASH, "FCF ÷ adjusted EBITDA: ≥ 50% Low · ≥ 25% Moderate · ≥ 0% High · negative Critical", "EBITDA is not positive.");
+    if (e == null || f == null) na(d, "Needs operating cash flow and capital expenditure.", ["Capital expenditure"], B.fcf);
+    else if (e <= 0) add(d, "Critical", `FCF ${fmtM(f)} on EBITDA ${fmtM(e)}`, DASH, B.fcf, "EBITDA is not positive.");
     else {
       const v = (f / e) * 100;
-      let lv = down(v, [50, 25, 0]);
+      let lv = down(v, T.fcf);
       const notes: string[] = [];
       if (c.operatingCashFlow! < c.capex!) notes.push("Operating cash flow does not cover capex.");
       const ds = c.interestExpense != null && c.principalRepayment != null ? c.interestExpense + c.principalRepayment : null;
       if (ds != null && f < ds) { notes.push(`Free cash flow (${fmtM(f)}) is below scheduled debt service (${fmtM(ds)}).`); lv = worst(lv, "High"); }
       const pf = fcf(1), pe = eAdj(1);
-      add(d, lv, `${pc(v)} (FCF ${fmtM(f)})`, pf != null && pe ? `${pc((pf / pe) * 100)} (FCF ${fmtM(pf)})` : DASH, "FCF ÷ adjusted EBITDA: ≥ 50% Low · ≥ 25% Moderate · ≥ 0% High · negative Critical. A positive ratio alone is not treated as low risk.", notes.length ? notes.join(" ") : "Cash left after capex is a healthy share of EBITDA.");
+      add(d, lv, `${pc(v)} (FCF ${fmtM(f)})`, pf != null && pe ? `${pc((pf / pe) * 100)} (FCF ${fmtM(pf)})` : DASH, B.fcf + ". A positive ratio alone is not treated as low risk.", notes.length ? notes.join(" ") : "Cash left after capex is a healthy share of EBITDA.");
     }
   }
   {
@@ -187,16 +198,16 @@ export function assessRisk(records: FinancialRecord[], metrics: YearMetrics[], i
   {
     const d: Def = { id: "dso", pillar: "wc", name: "Receivables collection performance", max: 7, questions: ["Provide receivables ageing by customer (30/60/90+ days) and the top-10 balances.", "Have credit terms, customer mix or collection practices changed?", "How much has been collected since the year-end?"] };
     const ch = dayChange("dso");
-    if (ch == null) na(d, "Needs receivables (or reported DSO) and sales for two years.", ["Receivables", "Revenue"], "Change in DSO: ≤ +2 days Low · ≤ +7 Moderate · ≤ +15 High · above Critical. Compared with the company's own history; no industry benchmark supplied.");
-    else add(d, up(ch, [2, 7, 15], false), `${fmtDays(mc.dso)} (${sg(ch, 1, " d")})`, fmtDays(mp!.dso), "Change in DSO: ≤ +2 days Low · ≤ +7 Moderate · ≤ +15 High · above Critical. Compared with the company's own history; no industry benchmark supplied.", ch > 2 ? "Customers are taking longer to pay. Overdue balances can't be seen without ageing data." : "Collection period is stable or improving.");
+    if (ch == null) na(d, "Needs receivables (or reported DSO) and sales for two years.", ["Receivables", "Revenue"], B.dso + ". Trend threshold; the level is also judged against the industry benchmark where one exists.");
+    else add(d, up(ch, T.dso, false), `${fmtDays(mc.dso)} (${sg(ch, 1, " d")})`, fmtDays(mp!.dso), B.dso + ". Trend threshold; the level is also judged against the industry benchmark where one exists.", ch > 2 ? "Customers are taking longer to pay. Overdue balances can't be seen without ageing data." : "Collection period is stable or improving.");
   }
   {
     const d: Def = { id: "dio", pillar: "wc", name: "Inventory efficiency", max: 5, questions: ["Provide inventory ageing and the provision for slow-moving stock.", "Is stock being built ahead of confirmed orders?", "What are the open purchase commitments?"] };
     const ch = dayChange("dio");
-    if (ch == null) na(d, "Needs inventory (or reported DIO) and COGS for two years. Some businesses hold little or no inventory.", ["Inventory", "COGS"], "Change in DIO: ≤ +2 days Low · ≤ +7 Moderate · ≤ +15 High · above Critical");
+    if (ch == null) na(d, "Needs inventory (or reported DIO) and COGS for two years. Some businesses hold little or no inventory.", ["Inventory", "COGS"], B.dio);
     else {
       const ig = p ? pct(c.inventory, p.inventory) : null, rg = p ? pct(c.revenue, p.revenue) : null;
-      add(d, up(ch, [2, 7, 15], false), `${fmtDays(mc.dio)} (${sg(ch, 1, " d")})${ig != null && rg != null ? `; inventory ${sg(ig, 1, "%")} vs revenue ${sg(rg, 1, "%")}` : ""}`, fmtDays(mp!.dio), "Change in DIO: ≤ +2 days Low · ≤ +7 Moderate · ≤ +15 High · above Critical", ch > 2 ? "Stock is turning more slowly. Slow-moving or obsolete stock can't be confirmed without SKU-level data." : "Inventory turnover is stable or improving.");
+      add(d, up(ch, T.dio, false), `${fmtDays(mc.dio)} (${sg(ch, 1, " d")})${ig != null && rg != null ? `; inventory ${sg(ig, 1, "%")} vs revenue ${sg(rg, 1, "%")}` : ""}`, fmtDays(mp!.dio), B.dio, ch > 2 ? "Stock is turning more slowly. Slow-moving or obsolete stock can't be confirmed without SKU-level data." : "Inventory turnover is stable or improving.");
     }
   }
   {
@@ -220,22 +231,22 @@ export function assessRisk(records: FinancialRecord[], metrics: YearMetrics[], i
   {
     const d: Def = { id: "lev", pillar: "debt", name: "Net debt / EBITDA", max: 7, questions: ["Provide the debt schedule: lenders, amounts, rates and maturities.", "What leverage do the covenants allow and what is the headroom?", "Is EBITDA adjusted in the lenders' definitions?"] };
     const nd = netDebt(0), e = eAdj(0);
-    if (nd == null || e == null) na(d, "Needs total debt, cash and EBITDA.", ["Total debt", "Cash", "EBITDA"], "Net debt ÷ adjusted EBITDA: < 2x Low · 2–3x Moderate · 3–4x High · above 4x Critical (indicative)");
-    else if (nd <= 0) add(d, "Low", `Net cash ${fmtM(-nd)}`, netDebt(1) != null ? `${fmtM(netDebt(1))} net debt` : DASH, "Net debt ÷ adjusted EBITDA: < 2x Low · 2–3x Moderate · 3–4x High · above 4x Critical (indicative)", "Cash exceeds debt.");
-    else if (e <= 0) add(d, "Critical", `Net debt ${fmtM(nd)} on EBITDA ${fmtM(e)}`, DASH, "Net debt ÷ adjusted EBITDA: < 2x Low · 2–3x Moderate · 3–4x High · above 4x Critical (indicative)", "EBITDA is not positive, so leverage is not meaningful and is scored at maximum.");
-    else { const v = nd / e; const pv = netDebt(1) != null && eAdj(1) ? netDebt(1)! / eAdj(1)! : null; add(d, up(v, [2, 3, 4]), `${fmtX(v)} (net debt ${fmtM(nd)} ÷ EBITDA ${fmtM(e)})`, fmtX(pv), "Net debt ÷ adjusted EBITDA: < 2x Low · 2–3x Moderate · 3–4x High · above 4x Critical (indicative, not industry standards)", v < 2 ? "Leverage is comfortable." : "Leverage is meaningful relative to earnings and gets harder to carry if cash conversion is weak."); }
+    if (nd == null || e == null) na(d, "Needs total debt, cash and EBITDA.", ["Total debt", "Cash", "EBITDA"], B.lev);
+    else if (nd <= 0) add(d, "Low", `Net cash ${fmtM(-nd)}`, netDebt(1) != null ? `${fmtM(netDebt(1))} net debt` : DASH, B.lev, "Cash exceeds debt.");
+    else if (e <= 0) add(d, "Critical", `Net debt ${fmtM(nd)} on EBITDA ${fmtM(e)}`, DASH, B.lev, "EBITDA is not positive, so leverage is not meaningful and is scored at maximum.");
+    else { const v = nd / e; const pv = netDebt(1) != null && eAdj(1) ? netDebt(1)! / eAdj(1)! : null; add(d, up(v, T.lev), `${fmtX(v)} (net debt ${fmtM(nd)} ÷ EBITDA ${fmtM(e)})`, fmtX(pv), B.lev + " (proposed screening thresholds, not industry standards)", v < 2 ? "Leverage is comfortable." : "Leverage is meaningful relative to earnings and gets harder to carry if cash conversion is weak."); }
   }
   {
     const d: Def = { id: "int", pillar: "debt", name: "Interest coverage", max: 5, questions: ["What are the interest rates and are they fixed or floating?", "What is the exposure to rate rises on refinancing?"] };
     const v = cover(0);
-    if (v == null) na(d, "Needs EBITDA and cash interest expense. Providers sometimes mark coverage “NM/NA” when interest is negligible.", ["Cash interest expense"], "EBITDA ÷ cash interest: ≥ 5x Low · ≥ 3x Moderate · ≥ 1.5x High · below Critical");
-    else add(d, down(v, [5, 3, 1.5]), `${fmtX(v, 1)} (EBITDA ${fmtM(eAdj(0))} ÷ interest ${fmtM(c.interestExpense)})`, fmtX(cover(1), 1), "EBITDA ÷ cash interest: ≥ 5x Low · ≥ 3x Moderate · ≥ 1.5x High · below Critical", v >= 5 ? "Earnings cover interest many times over." : "Interest takes a large share of earnings.");
+    if (v == null) na(d, "Needs EBITDA and cash interest expense. Providers sometimes mark coverage “NM/NA” when interest is negligible.", ["Cash interest expense"], B.cover);
+    else add(d, down(v, T.cover), `${fmtX(v, 1)} (EBITDA ${fmtM(eAdj(0))} ÷ interest ${fmtM(c.interestExpense)})`, fmtX(cover(1), 1), B.cover, v >= 5 ? "Earnings cover interest many times over." : "Interest takes a large share of earnings.");
   }
   {
     const d: Def = { id: "dscr", pillar: "debt", name: "Debt service coverage ratio", max: 5, questions: ["Provide the scheduled principal repayments for the next three years.", "Is the facility structure amortising or bullet, and what is the refinancing plan?"] };
     const v = dscr(0);
-    if (v == null) na(d, "Needs operating cash flow, interest and scheduled principal repayment. Repayment schedules are not in most financial statements.", ["Cash interest expense", "Scheduled principal repayment"], "(OCF + interest) ÷ (interest + scheduled principal): ≥ 1.5x Low · ≥ 1.2x Moderate · ≥ 1.0x High · below Critical");
-    else add(d, down(v, [1.5, 1.2, 1.0]), `${fmtX(v)} (CFADS ${fmtM(c.operatingCashFlow! + c.interestExpense!)} ÷ debt service ${fmtM(c.interestExpense! + c.principalRepayment!)})`, fmtX(dscr(1)), "(OCF + interest) ÷ (interest + scheduled principal): ≥ 1.5x Low · ≥ 1.2x Moderate · ≥ 1.0x High · below Critical. Cash flow available for debt service is operating cash flow with interest added back, as OCF is struck after interest paid.", v >= 1.5 ? "Cash flow comfortably covers interest and principal." : v >= 1 ? "Little headroom between cash flow and debt service." : "Cash flow does not cover scheduled debt service.");
+    if (v == null) na(d, "Needs operating cash flow, interest and scheduled principal repayment. Repayment schedules are not in most financial statements.", ["Cash interest expense", "Scheduled principal repayment"], B.dscr);
+    else add(d, down(v, T.dscr), `${fmtX(v)} (CFADS ${fmtM(c.operatingCashFlow! + c.interestExpense!)} ÷ debt service ${fmtM(c.interestExpense! + c.principalRepayment!)})`, fmtX(dscr(1)), B.dscr + ". Cash flow available for debt service is operating cash flow with interest added back, as OCF is struck after interest paid.", v >= 1.5 ? "Cash flow comfortably covers interest and principal." : v >= 1 ? "Little headroom between cash flow and debt service." : "Cash flow does not cover scheduled debt service.");
   }
   {
     const d: Def = { id: "mat", pillar: "debt", name: "Debt maturity concentration", max: 3, questions: ["Which facilities fall due in the next 12 months and are they committed for renewal?", "Are working-capital lines being used to fund long-term needs?"] };
@@ -248,19 +259,19 @@ export function assessRisk(records: FinancialRecord[], metrics: YearMetrics[], i
   {
     const d: Def = { id: "liqr", pillar: "liq", name: "Cash and short-term liquidity adequacy", max: 4, questions: ["What undrawn, committed facilities are available?", "What is the minimum operating cash balance the business needs?"] };
     const cr = currentRatio(0), qr = quickRatio(0);
-    if (cr == null && qr == null) na(d, "Needs current assets and current liabilities (or reported current and quick ratios).", ["Current assets", "Current liabilities"], "Current ratio: ≥ 1.5 Low · ≥ 1.1 Moderate · ≥ 0.8 High · below Critical. Quick ratio: ≥ 1.0 · ≥ 0.7 · ≥ 0.5 · below. Worse of the two applies.");
+    if (cr == null && qr == null) na(d, "Needs current assets and current liabilities (or reported current and quick ratios).", ["Current assets", "Current liabilities"], B.liq);
     else {
-      const lv = worst(...([cr != null ? down(cr, [1.5, 1.1, 0.8]) : null, qr != null ? down(qr, [1.0, 0.7, 0.5]) : null].filter((x) => x) as Severity[]));
-      add(d, lv, `Current ${fmtX(cr)} · quick ${fmtX(qr)}`, `Current ${fmtX(currentRatio(1))} · quick ${fmtX(quickRatio(1))}`, "Current ratio: ≥ 1.5 Low · ≥ 1.1 Moderate · ≥ 0.8 High · below Critical. Quick ratio: ≥ 1.0 · ≥ 0.7 · ≥ 0.5 · below. Worse of the two applies.", lv === "Low" ? "Short-term assets comfortably exceed short-term obligations." : "Short-term obligations are large relative to liquid assets.");
+      const lv = worst(...([cr != null ? down(cr, T.cr) : null, qr != null ? down(qr, T.qr) : null].filter((x) => x) as Severity[]));
+      add(d, lv, `Current ${fmtX(cr)} · quick ${fmtX(qr)}`, `Current ${fmtX(currentRatio(1))} · quick ${fmtX(quickRatio(1))}`, B.liq, lv === "Low" ? "Short-term assets comfortably exceed short-term obligations." : "Short-term obligations are large relative to liquid assets.");
     }
   }
   {
     const d: Def = { id: "down", pillar: "liq", name: "Revenue and EBITDA downside scenario", max: 3, questions: ["What is the sensitivity of EBITDA to a 10% revenue fall: how much cost is fixed?", "What management actions are available in a downturn?"] };
     const nd = netDebt(0);
-    if (!st || st.stressedEbitda == null || nd == null) na(d, "Needs revenue, EBITDA, debt and cash.", ["Revenue", "EBITDA", "Debt", "Cash"], "Net debt ÷ stressed EBITDA (revenue −10%, margin −3 pp): < 2x Low · ≤ 3x Moderate · ≤ 4x High · above or EBITDA ≤ 0 Critical");
+    if (!st || st.stressedEbitda == null || nd == null) na(d, "Needs revenue, EBITDA, debt and cash.", ["Revenue", "EBITDA", "Debt", "Cash"], B.levStress);
     else {
-      const lv: Severity = nd <= 0 ? "Low" : st.stressedEbitda <= 0 ? "Critical" : up(nd / st.stressedEbitda, [2, 3, 4]);
-      add(d, lv, `EBITDA ${fmtM(st.baseEbitda)} → ${fmtM(st.stressedEbitda)}; leverage ${nd <= 0 ? "net cash" : st.stressedNetDebtToEbitda == null ? DASH : fmtX(st.stressedNetDebtToEbitda)}`, DASH, "Net debt ÷ stressed EBITDA (revenue −10%, margin −3 pp): < 2x Low · ≤ 3x Moderate · ≤ 4x High · above or EBITDA ≤ 0 Critical", "Illustrative scenario, not a forecast.");
+      const lv: Severity = nd <= 0 ? "Low" : st.stressedEbitda <= 0 ? "Critical" : up(nd / st.stressedEbitda, T.lev);
+      add(d, lv, `EBITDA ${fmtM(st.baseEbitda)} → ${fmtM(st.stressedEbitda)}; leverage ${nd <= 0 ? "net cash" : st.stressedNetDebtToEbitda == null ? DASH : fmtX(st.stressedNetDebtToEbitda)}`, DASH, B.levStress, "Illustrative scenario, not a forecast.");
     }
   }
   {
@@ -270,6 +281,48 @@ export function assessRisk(records: FinancialRecord[], metrics: YearMetrics[], i
       const sf = st.shortfall ?? 0;
       const lv: Severity = sf === 0 ? "Low" : c.cash >= 1.5 * sf ? "Medium" : c.cash >= sf ? "High" : "Critical";
       add(d, lv, `Stressed OCF ${fmtM(st.stressedOcf)} vs need ${fmtM(st.requirement)}; shortfall ${fmtM(sf)}`, DASH, "Shortfall after stress (capex + principal − stressed OCF): none Low · covered 1.5x by cash Moderate · covered by cash High · otherwise Critical", `All four default scenarios applied together. ${st.requirementNote} Illustrative, not a forecast.`);
+    }
+  }
+
+  // ---------------------------------------------------------------- industry layer
+  // 1) not-applicable indicators leave the score; 2) a company's level is also judged against the industry benchmark
+  // (worst of trend and benchmark); 3) low-relevance indicators are capped at Moderate; 4) benchmark context is attached.
+  const setLevel = (i: Indicator, lv: Severity | null) => { i.level = lv; i.points = lv == null ? null : Math.round(i.max * LEVEL_SHARE[lv] * 10) / 10; };
+  const byId = (id: string) => out.find((x) => x.id === id)!;
+  const vsBench = (id: "dso" | "dio" | "dpo" | "margin") => {
+    const i = byId(id);
+    if (i.relevance === "na") return;
+    const m = INDICATOR_METRIC[id]!;
+    const b = ctx.bench(m);
+    const v = id === "margin" ? (margin(0) == null ? null : margin(0)! * 100) : mc?.[id] ?? null;
+    if (v == null || b.status === "unavailable") return;
+    let lv: Severity | null = null;
+    if (id === "margin") { if (b.low != null) lv = v >= b.low ? "Low" : v >= 0.5 * b.low && v >= 0 ? "Medium" : "High"; }
+    else if (id === "dpo") { if (b.high != null) lv = v > 1.5 * b.high ? "Medium" : "Low"; }
+    else if (b.high != null) lv = v <= b.high ? "Low" : v <= 1.25 * b.high ? "Medium" : v <= 1.5 * b.high ? "High" : "Critical";
+    if (lv == null) return;
+    const cmp = `${METRIC[m].label} ${fmtBench(v, m)} against a ${ctx.name} median of ${fmtBench(b.median, m)} (typical range ${benchRange(b, m)}).`;
+    if (i.level == null) { setLevel(i, lv); i.actual = fmtBench(v, m); i.explanation = `Assessed on the industry benchmark alone (no prior year to measure a trend). ${cmp}`; i.requires = []; }
+    else { const w = worst(i.level, lv); if (w !== i.level) { setLevel(i, w); i.explanation += ` Raised to ${levelName(w)} because the level is outside the industry benchmark. ${cmp}`; } else i.explanation += ` ${cmp}`; }
+  };
+  (["dso", "dio", "dpo", "margin"] as const).forEach(vsBench);
+  { // the cash conversion cycle is a diagnostic only: shown against its benchmark on the working-capital indicator, never scored
+    const b = ctx.bench("ccc"), o = byId("owc");
+    if (b.status !== "unavailable" && mc?.ccc != null && o.relevance !== "na") o.explanation += ` Cash conversion cycle ${fmtBench(mc.ccc, "ccc")} versus an industry median of ${fmtBench(b.median, "ccc")} (diagnostic only, not scored).`;
+  }
+  for (const i of out) {
+    if (i.relevance === "na") {
+      i.applicable = false; i.level = null; i.points = null; i.actual = DASH; i.previous = DASH; i.requires = [];
+      i.explanation = `Not Applicable to ${ctx.name}. ${ctx.def?.focus ?? ""}`.trim();
+    } else if (i.relevance === "low" && i.level && (i.level === "High" || i.level === "Critical")) {
+      setLevel(i, "Medium"); i.explanation += ` Capped at Moderate: this indicator has low relevance for ${ctx.name}.`;
+    }
+    const m = INDICATOR_METRIC[i.id as IndId];
+    if (i.applicable) {
+      const b = m ? ctx.bench(m) : null;
+      i.bench = b && b.status !== "unavailable"
+        ? { metric: METRIC[m!].label, median: fmtBench(b.median, m!), range: benchRange(b, m!), threshold: i.benchmark, source: b.source, tier: b.tier, reliability: b.reliability, geography: b.geography, year: `${b.year}, updated ${b.updated}`, status: b.status as "sourced" | "custom", note: b.note, url: b.url }
+        : { metric: m ? METRIC[m].label : i.name, median: "Industry Benchmark Unavailable", range: "—", threshold: i.benchmark, source: "None. Scored on a proposed screening threshold, not an industry average.", tier: "Proposed screening threshold", reliability: "Proposed screening threshold", geography: "n/a", year: "n/a", status: "unavailable", note: "No verified benchmark exists for this indicator in the supported sources. You can enter your own under Thresholds." };
     }
   }
 
@@ -285,7 +338,7 @@ export function assessRisk(records: FinancialRecord[], metrics: YearMetrics[], i
       severity: points == null ? "Low" : pillarSeverity(points, max),
       prev: top?.previous ?? DASH, curr: top?.actual ?? DASH,
       evidence: top ? `${top.name}: ${top.actual}` : `${assessed.length} of ${inds.length} indicators could be assessed.`,
-      explanation: assessed.length ? `${assessed.length} of ${inds.length} indicators assessed (${max} of ${pl.weight} points).` : "No indicator in this pillar could be assessed from the supplied data.",
+      explanation: assessed.length ? `${assessed.length} of ${inds.filter((i) => i.applicable).length} applicable indicators assessed (${max} of ${inds.filter((i) => i.applicable).reduce((t, i) => t + i.max, 0)} applicable points).` : inds.every((i) => !i.applicable) ? `No indicator in this pillar applies to ${ctx.name}.` : "No indicator in this pillar could be assessed from the supplied data.",
       questions: [...assessed].filter((i) => (i.points ?? 0) > 0).sort((a, b) => (b.points ?? 0) / b.max - (a.points ?? 0) / a.max).flatMap((i) => i.questions).slice(0, 4),
       indicators: inds,
     };
@@ -294,18 +347,31 @@ export function assessRisk(records: FinancialRecord[], metrics: YearMetrics[], i
   const assessedInds = out.filter((i) => i.points != null);
   const rawPoints = Math.round(assessedInds.reduce((s, i) => s + (i.points ?? 0), 0) * 10) / 10;
   const maxEvaluated = assessedInds.reduce((s, i) => s + i.max, 0);
-  const insufficient = maxEvaluated < MIN_COVERAGE;
+  const applicableMax = out.filter((i) => i.applicable).reduce((s, i) => s + i.max, 0);
+  const coverage = applicableMax ? Math.round((maxEvaluated / applicableMax) * 100) : 0;
+  const insufficient = coverage < MIN_COVERAGE || maxEvaluated === 0;
   const score = insufficient ? null : Math.round((rawPoints / maxEvaluated) * 100);
 
   const warnings: string[] = [];
-  for (const i of out) if (i.points == null) warnings.push(`${i.name} not assessed: needs ${i.requires.join(" and ").toLowerCase()}.`);
-  if (c.ebitda != null && (inputs.adjustmentStatus !== "verified" || inputs.ebitdaAdjustment == null)) warnings.push("Adjusted EBITDA equals reported EBITDA: no verified adjustments have been entered.");
+  for (const i of out) if (i.points == null && i.applicable) warnings.push(`${i.name} not assessed: needs ${i.requires.join(" and ").toLowerCase()}.`);
+  if (!ctx.selected) warnings.push("No industry selected: generic proposed screening thresholds are used and no industry benchmarks are applied.");
+  if (out.some((i) => !i.applicable)) warnings.push(`${out.filter((i) => !i.applicable).length} indicator(s) are Not Applicable to ${ctx.name} and are excluded from the score.`);
+  if (c.ebitda != null && (inputs.adjustmentStatus !== "verified" || adjustmentAmount(c, inputs, true) == null)) warnings.push("Adjusted EBITDA equals reported EBITDA: no verified adjustments have been entered.");
   if (metrics.some((m) => m.approximate)) warnings.push("The earliest year uses closing balances only for working-capital days.");
 
+  // confidence is about the evidence behind the score, not about how risky the company is
+  const reasons = [`${coverage}% of the applicable model could be assessed`, ctx.selected ? `industry: ${ctx.name}` : "no industry selected (generic thresholds)", `${n} annual period${n === 1 ? "" : "s"} of history`];
+  const approx = metrics.some((m) => m.approximate);
+  if (approx) reasons.push("earliest-year working-capital days use closing balances only");
+  if (inputs.adjustmentStatus !== "verified") reasons.push("EBITDA adjustments are not verified");
+  const confLevel: "High" | "Medium" | "Low" = insufficient ? "Low" : maxEvaluated >= 85 && n >= 3 && !approx ? "High" : maxEvaluated >= 60 ? "Medium" : "Low";
+
   return {
-    score, rawPoints, maxEvaluated, insufficient,
+    score, rawPoints, maxEvaluated, insufficient, confidence: { level: confLevel, reasons },
     classification: score == null ? "Insufficient Data" : classify(score),
-    evaluated: assessedInds.length, total: out.length, coverage: maxEvaluated,
+    evaluated: assessedInds.length, total: out.filter((i) => i.applicable).length, coverage,
+    notApplicable: out.filter((i) => !i.applicable).length,
+    industry: { name: ctx.name, sub: ctx.subName, selected: ctx.selected, focus: ctx.def?.focus ?? "No industry selected: generic proposed screening thresholds are in use." },
     categories, warnings,
   };
 }

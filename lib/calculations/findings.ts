@@ -18,7 +18,7 @@ export interface Finding {
   questions: string[];
 }
 
-const WHY: Record<string, { why: string; verify: string[] }> = {
+export const WHY: Record<string, { why: string; verify: string[] }> = {
   adj: { why: "Adjusted EBITDA sets the price. Every unsupported dirham of adjustment is multiplied by the entry multiple.", verify: ["Adjustment bridge with source documents", "Prior-year adjustments to test recurrence", "Independent quality-of-earnings review"] },
   revq: { why: "Revenue that isn't collected inflates growth without adding cash and may carry credit-loss risk.", verify: ["Receivables ageing by customer", "Post year-end cash receipts", "Credit notes and disputed invoices"] },
   margin: { why: "A shrinking margin means each dirham of revenue produces less profit, which lowers the value of the earnings being bought.", verify: ["Margin bridge by product and customer", "Input-cost and pricing history"] },
@@ -40,7 +40,7 @@ const WHY: Record<string, { why: string; verify: string[] }> = {
 };
 
 /** size the issue in AED where the data allows; never invent a figure */
-function impact(a: AnalysisResult, id: string): string | null {
+export function impact(a: AnalysisResult, id: string): string | null {
   const c = a.latestRecord, p = a.previousRecord, L = a.latest, P = a.previous;
   const sales = c.creditSales ?? c.revenue;
   switch (id) {
