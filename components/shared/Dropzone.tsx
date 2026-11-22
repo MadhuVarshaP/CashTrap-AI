@@ -9,7 +9,7 @@ import { parseFinancialFile, type ParseMeta } from "@/lib/utilities/parse";
 
 type S = { kind: "idle" } | { kind: "reading"; name: string; pct: number } | { kind: "ok"; name: string; warnings: string[]; notes: string[] } | { kind: "error"; errors: string[] };
 
-export function Dropzone({ onParsed, onError }: { onParsed: (r: FinancialRecord[], file: File, meta?: ParseMeta, warnings?: string[]) => void; onError?: (errors: string[], file: File) => void }) {
+export function Dropzone({ onParsed, onError, side }: { side?: React.ReactNode; onParsed: (r: FinancialRecord[], file: File, meta?: ParseMeta, warnings?: string[]) => void; onError?: (errors: string[], file: File) => void }) {
   const [s, setS] = useState<S>({ kind: "idle" });
   const [over, setOver] = useState(false);
   const input = useRef<HTMLInputElement>(null);
@@ -25,16 +25,16 @@ export function Dropzone({ onParsed, onError }: { onParsed: (r: FinancialRecord[
     onParsed(res.records, file, res.meta, res.warnings);
   }
 
-  // `contents` lets the drop square and the result box be separate cells of the parent grid, so the result can span the full row
+  // the drop square and the side panel share a row; the validation result always spans the full width below them
   return (
-    <div className="contents">
+    <div className="grid items-stretch gap-5 md:grid-cols-[minmax(200px,min(38%,300px))_minmax(0,1fr)]">
       <div
         onDragOver={(e) => { e.preventDefault(); setOver(true); }}
         onDragLeave={() => setOver(false)}
         onDrop={(e) => { e.preventDefault(); setOver(false); handle(e.dataTransfer.files[0]); }}
         onClick={() => input.current?.click()}
         role="button" tabIndex={0} onKeyDown={(e) => e.key === "Enter" && input.current?.click()}
-        className={clsx("flex aspect-square min-h-[230px] w-full cursor-pointer md:col-start-1 md:row-start-1 flex-col items-center justify-center rounded-2xl border border-dashed px-5 py-5 text-center transition-colors", over ? "border-accent bg-accent/[0.06]" : "border-line2 bg-bg2 hover:border-ink3")}
+        className={clsx("flex aspect-square min-h-[200px] w-full cursor-pointer flex-col items-center justify-center rounded-2xl border border-dashed px-5 py-5 text-center transition-colors", over ? "border-accent bg-accent/[0.06]" : "border-line2 bg-bg2 hover:border-ink3")}
       >
         <input ref={input} type="file" accept=".csv,.xlsx,.xls" hidden onChange={(e) => { handle(e.target.files?.[0]); e.target.value = ""; }} />
         <AnimatePresence mode="wait">
@@ -55,6 +55,7 @@ export function Dropzone({ onParsed, onError }: { onParsed: (r: FinancialRecord[
           )}
         </AnimatePresence>
       </div>
+      {side && <div className="min-w-0">{side}</div>}
       {s.kind === "ok" && (
         <div className="rounded-xl border border-pos/30 bg-pos/5 p-3.5 text-[12.5px] md:col-span-2 md:row-start-2">
           <div className="flex items-center gap-2 text-pos"><CheckCircle2 size={15} /> {s.name} validated</div>

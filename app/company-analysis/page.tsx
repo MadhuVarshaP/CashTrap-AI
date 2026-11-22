@@ -67,19 +67,15 @@ export default function CompanyAnalysis() {
         <div className={hasCompany ? "xl:col-span-7" : "xl:col-span-12"}>
         <Card className="mb-5">
           <CardHead title="Upload financial records" hint="Columns are matched by name; common aliases (Sales, OCF, Total Debt…) are recognised. Blank cells are treated as missing, never zero." />
-          <div className="grid items-start gap-5 md:grid-cols-[minmax(230px,290px)_minmax(0,1fr)]">
           <Dropzone onError={(errs, file) => notify({ title: `Couldn't read ${file.name}`, body: errs[0], tone: "crit" })} onParsed={(records, file, meta, warns) => {
             addDataset({ id: `upload-${Date.now()}`, name: draft.name || (meta?.name ?? file.name.replace(/\.[^.]+$/, "")), industry: "Uploaded company", synthetic: !!meta?.synthetic, records, unitMultiplier: meta?.unitMultiplier ?? 1_000_000, fileName: file.name, fileSize: file.size, fileCurrency: meta?.currency, inputs: { industry: draft.industry, subIndustry: draft.subIndustry, currency: draft.currency ?? meta?.currency ?? "AED", frequency: draft.frequency ?? "Annual" } });
             notify({ title: `Uploaded ${meta?.name ?? file.name}`, body: `${records.length} years loaded${warns?.length ? ` · ${warns.length} data warning${warns.length > 1 ? "s" : ""}` : ""}. Run the analysis next.`, tone: warns?.length ? "warn" : "pos", href: "/company-analysis" });
-          }} />
-            <div className="space-y-4 md:col-start-2 md:row-start-1">
-          <div className="flex flex-wrap items-center gap-3">
-            <Button variant="ghost" onClick={() => { loadDemo(); toast("Loaded the GulfTech sample company", "info"); }}><Database size={15} /> Explore with GulfTech Demo Data</Button>
-            <a download="cashcop-ai-template.csv" href={`data:text/csv;charset=utf-8,${encodeURIComponent(SAMPLE_CSV)}`} className="inline-flex items-center gap-2 text-[12.5px] text-ink2 hover:text-ink"><Download size={14} /> Download CSV template</a>
-          </div>
-          {hasCompany && (
-            <div className="rounded-xl border border-line bg-bg2 p-4">
-            <AnimatePresence mode="wait">
+          }} side={
+            <div className="flex h-full flex-col justify-between gap-5 rounded-2xl border border-line bg-gradient-to-br from-[#EEF3FF] via-white to-[#F3EEFF] p-5 shadow-card sm:p-6">
+              {hasCompany ? (
+                <div>
+                  <div className="mb-3 font-mono text-[10px] uppercase tracking-wider text-accent">Analysis</div>
+<AnimatePresence mode="wait">
               <motion.div key={status} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
                 {status === "processing" && (
                   <div>
@@ -98,10 +94,27 @@ export default function CompanyAnalysis() {
               <Button onClick={runAnalysis} disabled={!ready || status === "processing"} className="w-full sm:w-auto"><Play size={15} /> {status === "done" ? "Re-analyse Financials" : status === "failed" ? "Retry Analysis" : "Analyse Financials"}</Button>
               {status === "done" && <Link href="/overview"><Button variant="ghost">View dashboard</Button></Link>}
             </div>
+                </div>
+              ) : (
+                <div>
+                  <div className="font-mono text-[10px] uppercase tracking-wider text-accent">Get started</div>
+                  <h4 className="mt-1 font-display text-[17px] font-semibold">Three steps to your first assessment</h4>
+                  <ol className="mt-4 space-y-3.5">
+                    {[["Upload a statement", "A financial statement workbook or CSV with at least two years."], ["Review the data", "Check validation, field coverage and the target company profile."], ["Analyse", "Unlock the dashboard, risk analysis, cash bridge and report."]].map(([t, d], n) => (
+                      <li key={t} className="flex gap-3">
+                        <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-gradient-to-br from-accent to-ai text-[12px] font-semibold text-white shadow-card">{n + 1}</span>
+                        <span><span className="block text-[13.5px] font-medium">{t}</span><span className="block text-[12px] leading-snug text-ink3">{d}</span></span>
+                      </li>
+                    ))}
+                  </ol>
+                </div>
+              )}
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-3 border-t border-line pt-4">
+                <Button variant="ghost" onClick={() => { loadDemo(); toast("Loaded the GulfTech sample company", "info"); }}><Database size={13} /> Explore with GulfTech Demo Data</Button>
+                <a download="cashcop-ai-template.csv" href={`data:text/csv;charset=utf-8,${encodeURIComponent(SAMPLE_CSV)}`} className="inline-flex items-center gap-2 text-[12.5px] text-ink2 hover:text-ink"><Download size={14} /> Download CSV template</a>
+              </div>
             </div>
-          )}
-            </div>
-          </div>
+          } />
           <div className="mt-5 grid gap-6 border-t border-line pt-4 sm:grid-cols-2">
             <div>
               <div className="mb-2 font-mono text-[10px] uppercase tracking-wider text-ink3">Required columns · 3+ years recommended</div>
