@@ -67,19 +67,50 @@ export default function CompanyAnalysis() {
         <div className={hasCompany ? "xl:col-span-7" : "xl:col-span-12"}>
         <Card className="mb-5">
           <CardHead title="Upload financial records" hint="Columns are matched by name; common aliases (Sales, OCF, Total Debt…) are recognised. Blank cells are treated as missing, never zero." />
+          <div className="grid items-start gap-5 md:grid-cols-[minmax(230px,290px)_minmax(0,1fr)]">
           <Dropzone onError={(errs, file) => notify({ title: `Couldn't read ${file.name}`, body: errs[0], tone: "crit" })} onParsed={(records, file, meta, warns) => {
             addDataset({ id: `upload-${Date.now()}`, name: draft.name || (meta?.name ?? file.name.replace(/\.[^.]+$/, "")), industry: "Uploaded company", synthetic: !!meta?.synthetic, records, unitMultiplier: meta?.unitMultiplier ?? 1_000_000, fileName: file.name, fileSize: file.size, fileCurrency: meta?.currency, inputs: { industry: draft.industry, subIndustry: draft.subIndustry, currency: draft.currency ?? meta?.currency ?? "AED", frequency: draft.frequency ?? "Annual" } });
             notify({ title: `Uploaded ${meta?.name ?? file.name}`, body: `${records.length} years loaded${warns?.length ? ` · ${warns.length} data warning${warns.length > 1 ? "s" : ""}` : ""}. Run the analysis next.`, tone: warns?.length ? "warn" : "pos", href: "/company-analysis" });
           }} />
-          <div className="mt-4 flex flex-wrap items-center gap-3">
+            <div className="space-y-4">
+          <div className="flex flex-wrap items-center gap-3">
             <Button variant="ghost" onClick={() => { loadDemo(); toast("Loaded the GulfTech sample company", "info"); }}><Database size={15} /> Explore with GulfTech Demo Data</Button>
             <a download="cashcop-ai-template.csv" href={`data:text/csv;charset=utf-8,${encodeURIComponent(SAMPLE_CSV)}`} className="inline-flex items-center gap-2 text-[12.5px] text-ink2 hover:text-ink"><Download size={14} /> Download CSV template</a>
           </div>
-          <div className="mt-5 border-t border-line pt-4">
-            <div className="mb-2 font-mono text-[10px] uppercase tracking-wider text-ink3">Required columns (three or more years recommended)</div>
-            <div className="flex flex-wrap gap-1.5">{REQUIRED_COLUMNS.map((c) => <span key={c} className="rounded-md border border-line bg-bg2 px-2 py-1 font-mono text-[10.5px] text-ink2">{c}</span>)}</div>
-            <div className="mb-2 mt-4 font-mono text-[10px] uppercase tracking-wider text-ink3">Optional columns: unlock the bridge, coverage and liquidity checks</div>
-            <div className="flex flex-wrap gap-1.5">{["EBITDA_Adjustments", "Capex", "Cash_Taxes", "Cash_Interest", "Current_Assets", "Current_Liabilities", "Scheduled_Principal", "Annual_Purchases", "Credit_Sales"].map((c) => <span key={c} className="rounded-md border border-dashed border-line px-2 py-1 font-mono text-[10.5px] text-ink3">{c}</span>)}</div>
+          {hasCompany && (
+            <div className="rounded-xl border border-line bg-bg2 p-4">
+            <AnimatePresence mode="wait">
+              <motion.div key={status} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
+                {status === "processing" && (
+                  <div>
+                    <div className="mb-3 flex items-center gap-2 text-[13px]"><Loader2 size={16} className="animate-spin text-accent" /> Processing…</div>
+                    {["Validating records", "Computing DSO · DIO · DPO · CCC", "Scoring weighted risk model", "Detecting anomalies"].map((t, i) => (
+                      <motion.div key={t} initial={{ opacity: 0.2 }} animate={{ opacity: 1 }} transition={{ delay: i * 0.38 }} className="flex items-center gap-2 py-1 font-mono text-[11.5px] text-ink2"><span className="h-1.5 w-1.5 rounded-full bg-accent" />{t}</motion.div>
+                    ))}
+                  </div>
+                )}
+                {status === "failed" && <div role="alert" className="mb-3 rounded-xl border border-crit/30 bg-crit/5 p-3 text-[12.5px] text-crit">{error}</div>}
+                {status === "done" && analysis && <div className="mb-3 flex items-center gap-2 text-[13px] text-pos"><CheckCircle2 size={16} /> Analysis complete · {analysis.risk.classification}</div>}
+                {status === "idle" && <p className="mb-3 text-[12.5px] text-ink2">Inspect the records, then analyse. Results appear across the dashboard, assessment and report.</p>}
+              </motion.div>
+            </AnimatePresence>
+            <div className="flex flex-wrap gap-3">
+              <Button onClick={runAnalysis} disabled={!ready || status === "processing"} className="w-full sm:w-auto"><Play size={15} /> {status === "done" ? "Re-analyse Financials" : status === "failed" ? "Retry Analysis" : "Analyse Financials"}</Button>
+              {status === "done" && <Link href="/overview"><Button variant="ghost">View dashboard</Button></Link>}
+            </div>
+            </div>
+          )}
+            </div>
+          </div>
+          <div className="mt-5 grid gap-6 border-t border-line pt-4 sm:grid-cols-2">
+            <div>
+              <div className="mb-2 font-mono text-[10px] uppercase tracking-wider text-ink3">Required columns · 3+ years recommended</div>
+              <ul className="space-y-1.5">{REQUIRED_COLUMNS.map((c) => <li key={c} className="flex items-center gap-2 font-mono text-[11.5px] text-ink2"><span className="h-1.5 w-1.5 shrink-0 rounded-full bg-accent" />{c}</li>)}</ul>
+            </div>
+            <div>
+              <div className="mb-2 font-mono text-[10px] uppercase tracking-wider text-ink3">Optional columns · unlock bridge, coverage, liquidity</div>
+              <ul className="space-y-1.5">{["EBITDA_Adjustments", "Capex", "Cash_Taxes", "Cash_Interest", "Current_Assets", "Current_Liabilities", "Scheduled_Principal", "Annual_Purchases", "Credit_Sales"].map((c) => <li key={c} className="flex items-center gap-2 font-mono text-[11.5px] text-ink3"><span className="h-1.5 w-1.5 shrink-0 rounded-full border border-line2" />{c}</li>)}</ul>
+            </div>
           </div>
         </Card>
         <IndustryProfile draft={hasCompany ? undefined : { value: draft, set: setDraft }} />
@@ -135,29 +166,6 @@ export default function CompanyAnalysis() {
                 </select>
               </label>
             )}
-          </Card>
-
-          <Card>
-            <CardHead title="Run analysis" />
-            <AnimatePresence mode="wait">
-              <motion.div key={status} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
-                {status === "processing" && (
-                  <div>
-                    <div className="mb-3 flex items-center gap-2 text-[13px]"><Loader2 size={16} className="animate-spin text-accent" /> Processing…</div>
-                    {["Validating records", "Computing DSO · DIO · DPO · CCC", "Scoring weighted risk model", "Detecting anomalies"].map((t, i) => (
-                      <motion.div key={t} initial={{ opacity: 0.2 }} animate={{ opacity: 1 }} transition={{ delay: i * 0.38 }} className="flex items-center gap-2 py-1 font-mono text-[11.5px] text-ink2"><span className="h-1.5 w-1.5 rounded-full bg-accent" />{t}</motion.div>
-                    ))}
-                  </div>
-                )}
-                {status === "failed" && <div role="alert" className="mb-3 rounded-xl border border-crit/30 bg-crit/5 p-3 text-[12.5px] text-crit">{error}</div>}
-                {status === "done" && analysis && <div className="mb-3 flex items-center gap-2 text-[13px] text-pos"><CheckCircle2 size={16} /> Analysis complete · {analysis.risk.classification}</div>}
-                {status === "idle" && <p className="mb-3 text-[12.5px] text-ink2">Inspect the records, then analyse. Results appear across the dashboard, assessment and report.</p>}
-              </motion.div>
-            </AnimatePresence>
-            <div className="flex flex-wrap gap-3">
-              <Button onClick={runAnalysis} disabled={!ready || status === "processing"} className="w-full sm:w-auto"><Play size={15} /> {status === "done" ? "Re-analyse Financials" : status === "failed" ? "Retry Analysis" : "Analyse Financials"}</Button>
-              {status === "done" && <Link href="/overview"><Button variant="ghost">View dashboard</Button></Link>}
-            </div>
           </Card>
         </div>}
 

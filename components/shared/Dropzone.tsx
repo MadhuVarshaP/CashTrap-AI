@@ -33,7 +33,7 @@ export function Dropzone({ onParsed, onError }: { onParsed: (r: FinancialRecord[
         onDrop={(e) => { e.preventDefault(); setOver(false); handle(e.dataTransfer.files[0]); }}
         onClick={() => input.current?.click()}
         role="button" tabIndex={0} onKeyDown={(e) => e.key === "Enter" && input.current?.click()}
-        className={clsx("flex min-h-[210px] cursor-pointer flex-col items-center justify-center rounded-2xl border border-dashed px-6 py-8 text-center transition-colors", over ? "border-accent bg-accent/[0.06]" : "border-line2 bg-bg2 hover:border-ink3")}
+        className={clsx("flex aspect-square min-h-[230px] w-full cursor-pointer flex-col items-center justify-center rounded-2xl border border-dashed px-5 py-5 text-center transition-colors", over ? "border-accent bg-accent/[0.06]" : "border-line2 bg-bg2 hover:border-ink3")}
       >
         <input ref={input} type="file" accept=".csv,.xlsx,.xls" hidden onChange={(e) => { handle(e.target.files?.[0]); e.target.value = ""; }} />
         <AnimatePresence mode="wait">
@@ -46,10 +46,10 @@ export function Dropzone({ onParsed, onError }: { onParsed: (r: FinancialRecord[
             </motion.div>
           ) : (
             <motion.div key="i" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-              <span className="mx-auto mb-4 grid h-12 w-12 place-items-center rounded-2xl bg-elev text-accent"><UploadCloud size={22} /></span>
-              <div className="text-[15px] font-medium">Drop a financial statement file here</div>
+              <span className="mx-auto mb-3 grid h-12 w-12 place-items-center rounded-2xl bg-elev text-accent"><UploadCloud size={22} /></span>
+              <div className="text-[14px] font-medium">Drop a financial statement file here</div>
               <div className="mt-1 text-[12.5px] text-ink2">or click to browse</div>
-              <div className="mt-4 flex items-center justify-center gap-2 font-mono text-[10.5px] text-ink3"><FileSpreadsheet size={13} /> .xlsx · .csv · max 5 MB · min. 2 years</div>
+              <div className="mt-3 flex flex-wrap justify-center items-center justify-center gap-2 font-mono text-[10.5px] text-ink3"><FileSpreadsheet size={13} /> .xlsx · .csv · max 5 MB · min. 2 years</div>
             </motion.div>
           )}
         </AnimatePresence>
