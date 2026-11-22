@@ -29,7 +29,6 @@ const TABS = [
   { id: "wc", label: "Working capital" },
   { id: "debt", label: "Debt & repayment" },
   { id: "liq", label: "Liquidity & stress" },
-  { id: "val", label: "Valuation" },
   { id: "thr", label: "Thresholds" },
   { id: "reg", label: "Indicator register" },
 ] as const;
@@ -75,7 +74,6 @@ function Page({ a }: { a: AnalysisResult }) {
         {tab === "wc" && <WC a={a} pillar={risk.categories[2]} />}
         {tab === "debt" && <Debt a={a} pillar={risk.categories[3]} />}
         {tab === "liq" && <Liquidity a={a} pillar={risk.categories[4]} />}
-        {tab === "val" && <Valuation a={a} />}
         {tab === "thr" && <Thresholds a={a} />}
         {tab === "reg" && <Register a={a} />}
       </motion.div>
@@ -375,61 +373,6 @@ function Liquidity({ a, pillar }: { a: AnalysisResult; pillar: RiskCategory }) {
       </Card>
       <Indicators p={pillar} />
     </>
-  );
-}
-
-/* ------------------------------------------------------------------ valuation */
-
-function Valuation({ a }: { a: AnalysisResult }) {
-  const { updateInputs } = useApp();
-  const i = a.inputs, v = buildValuation(a), r = v.returns;
-  return (
-    <div className="grid gap-5 xl:grid-cols-12">
-      <Card className="xl:col-span-5">
-        <CardHead title="Acquisition inputs" hint={`Enter the deal assumptions in ${cur()} millions. Nothing here is estimated for you.`} />
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">
-          <NumInput label="Proposed enterprise value" value={i.enterpriseValue} unit={`${cur()} m`} onCommit={(n) => updateInputs({ enterpriseValue: n })} />
-          <NumInput label="Acquisition debt" value={i.acquisitionDebt} unit={`${cur()} m`} onCommit={(n) => updateInputs({ acquisitionDebt: n })} hint="Left blank = enterprise value − equity." />
-          <NumInput label="Equity invested" value={i.equityInvested} unit={`${cur()} m`} onCommit={(n) => updateInputs({ equityInvested: n })} />
-          <NumInput label="Holding period" value={i.holdYears} unit="years" onCommit={(n) => updateInputs({ holdYears: n })} hint="Default 5." />
-          <NumInput label="EBITDA growth" value={i.ebitdaGrowth} unit="% a year" onCommit={(n) => updateInputs({ ebitdaGrowth: n })} hint="Default: historical, capped 0–10%." />
-          <NumInput label="Exit multiple" value={i.exitMultiple} unit="x EBITDA" onCommit={(n) => updateInputs({ exitMultiple: n })} hint="Default: entry multiple." />
-        </div>
-        <p className="mt-4 rounded-xl border border-line bg-bg2 p-3 text-[12px] leading-relaxed text-ink3">The risk score is not turned into an attractiveness score. A risky company can be attractive at the right price; a healthy one can be unattractive if the price is too high. Risks and deal assumptions are shown separately.</p>
-      </Card>
-
-      <div className="space-y-5 xl:col-span-7">
-        <Card>
-          <CardHead title="Entry valuation" hint="Facts from the data and your inputs." />
-          <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
-            <Stat label="Reported EBITDA" value={fmtM(v.reportedEbitda)} /><Stat label="Adjusted EBITDA" value={fmtM(v.adjustedEbitda)} sub={v.normalisation ? `${fmtM(v.normalisation)} normalisation` : "no verified adjustments"} />
-            <Stat label="Entry EV / adj. EBITDA" value={fmtX(v.entryMultiple, 1)} sub={v.reportedMultiple != null && v.reportedMultiple !== v.entryMultiple ? `${fmtX(v.reportedMultiple, 1)} on reported` : undefined} />
-            <Stat label="Existing net debt" value={fmtM(v.netDebt)} /><Stat label="Implied equity value" value={fmtM(v.equityValue)} sub="EV − net debt" />
-            <Stat label="Acquisition leverage" value={fmtX(v.entryLeverage)} sub={v.debtDerived ? "debt = EV − equity" : undefined} tone={v.entryLeverage != null && v.entryLeverage > 4 ? "crit" : undefined} />
-          </div>
-          {v.fundingGap != null && Math.abs(v.fundingGap) > 0.05 && <p role="alert" className="mt-3 rounded-xl border border-warn/30 bg-warn/5 p-3 text-[12.5px] text-warn">Sources and uses differ by {fmtM(Math.abs(v.fundingGap))}: debt + equity {v.fundingGap > 0 ? "fall short of" : "exceed"} enterprise value.</p>}
-          {v.entryMultiple == null && <p className="mt-3 text-[12.5px] text-ink3">Enter a proposed enterprise value to see the entry multiple.</p>}
-        </Card>
-        <Card>
-          <CardHead title="Value levers" hint="Potential price or cash adjustments from the working-capital findings. Estimates, not guarantees." />
-          <div className="grid gap-3 sm:grid-cols-2">
-            <Stat label="Working capital above prior-year share" value={v.wcExcess == null ? "—" : fmtM(v.wcExcess)} sub="possible peg / price adjustment" />
-            <Stat label="One-off cash from cutting DSO 15 days" value={fmtM(v.cashRelease15)} sub="assumes revenue constant" />
-          </div>
-        </Card>
-        <Card>
-          <CardHead title="Illustrative returns" hint="Assumption-driven, not a forecast. Uses today's free cash flow conversion to repay acquisition debt; ignores financing costs and tax." right={<Pill tone="warn">Assumptions</Pill>} />
-          {r == null ? <p className="text-[13px] text-ink2">Needs a proposed enterprise value, equity invested and positive adjusted EBITDA.</p> : (
-            <>
-              <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-                <Stat label="Exit EBITDA" value={fmtM(r.exitEbitda)} sub={`${r.growth.toFixed(1)}% a year · ${r.growthSource}`} /><Stat label="Exit EV" value={fmtM(r.exitEv)} sub={`${fmtX(r.exitMultiple, 1)} · ${r.exitMultipleSource}`} />
-                <Stat label="Exit equity" value={fmtM(r.exitEquity)} sub={r.paydown == null ? "debt paydown not modelled (no capex)" : `after ${fmtM(r.paydown)} debt repaid`} /><Stat label="MOIC / IRR" value={`${r.moic.toFixed(2)}x / ${r.irr.toFixed(0)}%`} tone={r.moic < 1 ? "crit" : r.moic >= 2 ? "pos" : undefined} sub={`${r.holdYears}-year hold`} />
-              </div>
-            </>
-          )}
-        </Card>
-      </div>
-    </div>
   );
 }
 
