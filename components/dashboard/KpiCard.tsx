@@ -2,6 +2,7 @@
 
 import clsx from "clsx";
 import { ArrowDownRight, ArrowUpRight, Minus } from "lucide-react";
+import { Tilt } from "@/components/shared/Tilt";
 import { Card, CountNum, Money, Spark, Term } from "@/components/shared/ui";
 
 export interface Kpi {
@@ -15,10 +16,11 @@ export interface Kpi {
 }
 
 export function KpiCard({ k, big }: { k: Kpi; big?: boolean }) {
-  const color = k.tone === "pos" ? "#35C994" : k.tone === "neg" ? "#F06464" : "#A2A7B0";
+  const color = k.tone === "pos" ? "#35C994" : k.tone === "neg" ? "#F06464" : "var(--c-axis)";
   const Icon = k.tone === "pos" ? ArrowUpRight : k.tone === "neg" ? ArrowDownRight : Minus;
   return (
-    <Card className={clsx("flex flex-col justify-between", big ? "min-h-[190px]" : "min-h-[168px]")}>
+    <Tilt max={5} className="h-full rounded-card [perspective:900px]">
+    <Card hover={false} className={clsx("flex h-full flex-col justify-between", big ? "min-h-[190px]" : "min-h-[168px]")}>
       <div>
         <div className="flex items-center gap-1.5 text-[12px] text-ink2">{k.label}<Term tip={k.tip} /></div>
         <div className={clsx("mt-2 font-display font-semibold tracking-tight", big ? "text-[38px]" : "text-[30px]")}>
@@ -30,5 +32,6 @@ export function KpiCard({ k, big }: { k: Kpi; big?: boolean }) {
         {k.trend.length > 1 && <div className="h-9 w-20 shrink-0"><Spark data={k.trend.filter((v) => v != null)} color={color} /></div>}
       </div>
     </Card>
+    </Tilt>
   );
 }

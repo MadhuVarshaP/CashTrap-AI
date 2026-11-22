@@ -2,16 +2,17 @@
 
 import clsx from "clsx";
 import { motion } from "framer-motion";
-import { AlertTriangle, Info } from "lucide-react";
+import { AlertTriangle } from "lucide-react";
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { Bar as RBar, CartesianGrid, ComposedChart, Legend, Line, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Waterfall } from "@/components/charts/Waterfall";
+import { BridgeByYear } from "@/components/risk/BridgeByYear";
 import { NumInput, Stat } from "@/components/risk/parts";
 import { axisM } from "@/components/risk/charts";
 import { WithAnalysis } from "@/components/shared/Guard";
 import { Card, CardHead, PageTitle, chartTooltip } from "@/components/shared/ui";
-import { buildBridge, bridgeSteps, type BridgeYear } from "@/lib/calculations/cashbridge";
+import { buildBridge, bridgeSteps } from "@/lib/calculations/cashbridge";
 import { useApp } from "@/lib/state/store";
 import { DASH, fmtM, fmtPct, cur } from "@/lib/utilities/format";
 import type { AnalysisResult } from "@/types/finance";
@@ -104,56 +105,29 @@ function Page({ a }: { a: AnalysisResult }) {
           </div>
         </Card>
 
-        <Card className="xl:col-span-7">
+        <BridgeByYear years={years} selected={yr} onSelect={setYr} />
+
+        <Card className="xl:col-span-12">
           <CardHead title="Multi-year comparison" hint="Adjusted EBITDA, operating cash flow and free cash flow for each year, with cash conversion." />
           <div className="h-[290px]">
             <ResponsiveContainer>
               <ComposedChart data={chart} margin={{ top: 8, right: 4, left: -8, bottom: 0 }}>
-                <CartesianGrid stroke="#23262d" vertical={false} />
-                <XAxis dataKey="year" stroke="#707681" fontSize={11} tickLine={false} axisLine={false} />
-                <YAxis yAxisId="l" stroke="#707681" fontSize={11} tickLine={false} axisLine={false} width={48} tickFormatter={axisM} />
-                <YAxis yAxisId="r" orientation="right" stroke="#707681" fontSize={11} tickLine={false} axisLine={false} width={40} unit="%" />
+                <CartesianGrid stroke="var(--c-grid)" vertical={false} />
+                <XAxis dataKey="year" stroke="var(--c-axis)" fontSize={11} tickLine={false} axisLine={false} />
+                <YAxis yAxisId="l" stroke="var(--c-axis)" fontSize={11} tickLine={false} axisLine={false} width={48} tickFormatter={axisM} />
+                <YAxis yAxisId="r" orientation="right" stroke="var(--c-axis)" fontSize={11} tickLine={false} axisLine={false} width={40} unit="%" />
                 <Tooltip {...chartTooltip} formatter={(v: number, n: string) => (n === "conv" ? [`${v.toFixed(0)}%`, "Cash conversion"] : [fmtM(v), n === "adjusted" ? "Adjusted EBITDA" : n === "ocf" ? "Operating cash flow" : "Free cash flow"])} />
-                <Legend wrapperStyle={{ fontSize: 11, color: "#A2A7B0" }} formatter={(v) => (v === "adjusted" ? "Adjusted EBITDA" : v === "ocf" ? "Operating cash flow" : v === "fcf" ? "Free cash flow" : "Cash conversion (right)")} />
-                <ReferenceLine yAxisId="l" y={0} stroke="#3a3f49" />
+                <Legend wrapperStyle={{ fontSize: 11, color: "var(--c-tick)" }} formatter={(v) => (v === "adjusted" ? "Adjusted EBITDA" : v === "ocf" ? "Operating cash flow" : v === "fcf" ? "Free cash flow" : "Cash conversion (right)")} />
+                <ReferenceLine yAxisId="l" y={0} stroke="var(--c-muted)" />
                 <RBar yAxisId="l" dataKey="adjusted" fill="#35C994" radius={[3, 3, 0, 0]} maxBarSize={22} animationDuration={600} />
                 <RBar yAxisId="l" dataKey="ocf" fill="#F5A640" radius={[3, 3, 0, 0]} maxBarSize={22} animationDuration={600} />
                 <RBar yAxisId="l" dataKey="fcf" fill="#3988F5" radius={[3, 3, 0, 0]} maxBarSize={22} animationDuration={600} />
-                <Line yAxisId="r" dataKey="conv" stroke="#A78BFA" strokeWidth={2.2} dot={{ r: 3.5, fill: "#17191E", strokeWidth: 2 }} animationDuration={700} />
+                <Line yAxisId="r" dataKey="conv" stroke="#A78BFA" strokeWidth={2.2} dot={{ r: 3.5, fill: "var(--c-card)", strokeWidth: 2 }} animationDuration={700} />
               </ComposedChart>
             </ResponsiveContainer>
           </div>
         </Card>
 
-        <Card className="xl:col-span-5" hover={false}>
-          <CardHead title="Bridge by year" hint={`${cur()} millions. n/s = not supplied.`} />
-          <div className="-mx-5 overflow-x-auto px-5">
-            <table className="w-full min-w-[320px] border-collapse text-[12px]">
-              <thead><tr className="border-b border-line font-mono text-[10px] uppercase tracking-wider text-ink3"><th className="py-2 text-left font-medium">Item</th>{years.map((y) => <th key={y.year} className="px-2 py-2 text-right font-medium">FY{y.year}</th>)}</tr></thead>
-              <tbody>
-                {([
-                  ["Reported EBITDA", (y: BridgeYear) => y.reported, false],
-                  ["+ Verified adjustments", (y: BridgeYear) => y.adjustment, false],
-                  ["= Adjusted EBITDA", (y: BridgeYear) => y.adjusted, true],
-                  ["− Working capital", (y: BridgeYear) => y.wcIncrease, false],
-                  ["− Cash taxes", (y: BridgeYear) => y.taxes, false],
-                  ["− Capex", (y: BridgeYear) => y.capex, false],
-                  ["− Cash interest", (y: BridgeYear) => y.interest, false],
-                  ["± Other", (y: BridgeYear) => y.other, false],
-                  ["= Free cash flow", (y: BridgeYear) => y.fcf, true],
-                  ["Operating cash flow", (y: BridgeYear) => y.ocf, true],
-                  ["Cash gap", (y: BridgeYear) => y.gap, false],
-                ] as [string, (y: BridgeYear) => number | null, boolean][]).map(([l, f, bold]) => (
-                  <tr key={l} className="border-b border-line/60">
-                    <td className={clsx("py-2 pr-2", bold ? "font-medium text-ink" : "text-ink2")}>{l}</td>
-                    {years.map((y) => <td key={y.year} className={clsx("px-2 py-2 text-right font-mono tabular-nums", bold ? "text-ink" : "text-ink2")}>{f(y) == null ? "n/s" : f(y)!.toLocaleString("en-US", { maximumFractionDigits: 1 })}</td>)}
-                  </tr>
-                ))}
-                <tr><td className="py-2 pr-2 font-medium text-ink">Cash conversion</td>{years.map((y) => <td key={y.year} className="px-2 py-2 text-right font-mono tabular-nums">{y.conversion == null ? DASH : fmtPct(y.conversion, 0)}</td>)}</tr>
-              </tbody>
-            </table>
-          </div>
-        </Card>
       </div>
 
     </>
