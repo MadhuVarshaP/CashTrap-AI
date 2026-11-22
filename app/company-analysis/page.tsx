@@ -72,7 +72,7 @@ export default function CompanyAnalysis() {
             addDataset({ id: `upload-${Date.now()}`, name: draft.name || (meta?.name ?? file.name.replace(/\.[^.]+$/, "")), industry: "Uploaded company", synthetic: !!meta?.synthetic, records, unitMultiplier: meta?.unitMultiplier ?? 1_000_000, fileName: file.name, fileSize: file.size, fileCurrency: meta?.currency, inputs: { industry: draft.industry, subIndustry: draft.subIndustry, currency: draft.currency ?? meta?.currency ?? "AED", frequency: draft.frequency ?? "Annual" } });
             notify({ title: `Uploaded ${meta?.name ?? file.name}`, body: `${records.length} years loaded${warns?.length ? ` · ${warns.length} data warning${warns.length > 1 ? "s" : ""}` : ""}. Run the analysis next.`, tone: warns?.length ? "warn" : "pos", href: "/company-analysis" });
           }} />
-            <div className="space-y-4">
+            <div className="space-y-4 md:col-start-2 md:row-start-1">
           <div className="flex flex-wrap items-center gap-3">
             <Button variant="ghost" onClick={() => { loadDemo(); toast("Loaded the GulfTech sample company", "info"); }}><Database size={15} /> Explore with GulfTech Demo Data</Button>
             <a download="cashcop-ai-template.csv" href={`data:text/csv;charset=utf-8,${encodeURIComponent(SAMPLE_CSV)}`} className="inline-flex items-center gap-2 text-[12.5px] text-ink2 hover:text-ink"><Download size={14} /> Download CSV template</a>
