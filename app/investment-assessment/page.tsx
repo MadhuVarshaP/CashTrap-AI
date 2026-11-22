@@ -16,7 +16,6 @@ import { adjustedEbitda, allIndicators, levelName } from "@/lib/calculations/pe-
 import { DEFAULT_STRESS, runStress, type StressInput } from "@/lib/calculations/stress";
 import { buildValuation } from "@/lib/calculations/valuation";
 import { THRESHOLD_DEFS, resolveThresholds } from "@/lib/calculations/thresholds";
-import { IndustryProfile } from "@/components/risk/IndustryProfile";
 import { INDICATOR_METRIC, METRIC, getBench, benchRange, fmtBench, type BenchMetric } from "@/lib/benchmarks/resolve";
 import { industryById } from "@/lib/benchmarks/industries";
 import { useApp } from "@/lib/state/store";
@@ -56,7 +55,14 @@ function Page({ a }: { a: AnalysisResult }) {
       <PageTitle title="Investment Risk Analysis" sub="Five pillars of financial risk, scored from the data, evidenced and ready to investigate." right={
         <div className="flex flex-wrap gap-2"><Pill tone="warn">Screening score · not a recommendation</Pill><Link href="/due-diligence-report"><Button variant="ghost"><FileText size={14} /> Due diligence report</Button></Link></div>
       } />
-      <IndustryProfile />
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-line bg-card px-5 py-3.5 shadow-card">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[13px]">
+          <span className="font-mono text-[10px] uppercase tracking-wider text-ink3">Target industry</span>
+          {risk.industry.selected ? <span className="font-medium">{risk.industry.name}{risk.industry.sub ? ` · ${risk.industry.sub}` : ""}</span> : <span className="font-medium text-warn">Not selected: generic screening thresholds are in use</span>}
+          <span className="text-ink3">{a.inputs.currency ?? "AED"} · {a.inputs.frequency ?? "Annual"}</span>
+        </div>
+        <Link href="/company-analysis" className="text-[12.5px] font-medium text-accent hover:underline">Change in Data & upload →</Link>
+      </div>
       <div role="tablist" aria-label="Investment risk sections" className="-mx-4 mb-6 flex gap-1.5 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0">
         {TABS.map((t) => (
           <button key={t.id} role="tab" aria-selected={tab === t.id} onClick={() => setTab(t.id)} className={clsx("tap shrink-0 rounded-xl border px-4 py-2.5 text-[13px]", tab === t.id ? "border-accent/50 bg-accent/10 text-ink" : "border-line bg-card text-ink2 hover:border-line2 hover:text-ink")}>{t.label}</button>
@@ -166,7 +172,7 @@ function Dashboard({ a, go }: { a: AnalysisResult; go: (t: Tab) => void }) {
       <Card className="xl:col-span-12">
         <CardHead title="Assessment coverage" hint="Share of the applicable model the supplied data could support. Missing data is never scored as zero risk; not-applicable indicators are left out." />
         <div className="mb-2 flex items-baseline gap-2"><span className="font-display text-[34px] font-semibold tabular-nums">{risk.coverage}%</span><span className="text-ink3">of the model assessed · {risk.evaluated} of {risk.total} indicators</span></div>
-        <Bar value={risk.coverage} max={100} color={risk.coverage >= 70 ? "#35C994" : "#F5A640"} className="h-2" />
+        <Bar value={risk.coverage} max={100} color={risk.coverage >= 70 ? "#10B981" : "#F59E0B"} className="h-2" />
         {notApplicable.length > 0 && (
           <div className="mt-4">
             <div className="mb-2 font-mono text-[10px] uppercase tracking-wider text-ink3">Not applicable to {risk.industry.name} ({notApplicable.length}): excluded from the score</div>
@@ -183,7 +189,7 @@ function Dashboard({ a, go }: { a: AnalysisResult; go: (t: Tab) => void }) {
       </Card>
 
       <Card className="xl:col-span-12 !border-ai/25">
-        <CardHead icon={<Sparkles size={17} className="text-ai" />} title="Investment findings" hint="The three most material risks, written only from calculated metrics. Hypotheses are labelled as such." right={<Pill tone="ai">Deterministic · no AI model called</Pill>} />
+        <CardHead icon={<Sparkles size={17} className="text-ai" />} title="Investment findings" hint="The three most material risks, written only from calculated metrics. Hypotheses are labelled as such."  />
         {findings.length === 0 ? <p className="text-[13px] text-ink2">No indicator scored risk points on the evaluated data.</p> : (
           <div className="grid gap-4 lg:grid-cols-3">
             {findings.map((f, n) => (
@@ -292,7 +298,7 @@ function LeverageMeter({ v }: { v: number | null }) {
   const pos = v == null ? null : Math.max(0, Math.min(5, v)) / 5 * 100;
   return (
     <div>
-      <div className="relative h-3 overflow-hidden rounded-full" style={{ background: "linear-gradient(90deg,#35C994 0 40%,#F5A640 40% 60%,#F58B5C 60% 80%,#F06464 80% 100%)" }}>
+      <div className="relative h-3 overflow-hidden rounded-full" style={{ background: "linear-gradient(90deg,#10B981 0 40%,#F59E0B 40% 60%,#FB7C3C 60% 80%,#F43F5E 80% 100%)" }}>
         {pos != null && <span className="absolute top-1/2 h-5 w-1 -translate-y-1/2 rounded bg-white shadow" style={{ left: `calc(${pos}% - 2px)` }} />}
       </div>
       <div className="mt-1.5 flex justify-between font-mono text-[10px] text-ink3"><span>0x</span><span>2x</span><span>3x</span><span>4x</span><span>5x+</span></div>
@@ -486,7 +492,7 @@ function Thresholds({ a }: { a: AnalysisResult }) {
     <div className="space-y-5">
       <Card hover={false}>
         <CardHead title={`Industry benchmarks: ${def?.name ?? "none selected"}`} hint="The median, typical range and risk threshold are three different things. The median is the middle of the industry distribution, the typical range is its 25th to 75th percentile, and the risk threshold is where scoring turns a level up. The industry average is never treated as the target." />
-        {!def ? <p className="text-[13px] text-ink2">Select an industry in the profile above to load benchmarks.</p> : (
+        {!def ? <p className="text-[13px] text-ink2">Select an industry under Data & upload to load benchmarks.</p> : (
           <div className="-mx-5 overflow-x-auto px-5">
             <table className="w-full min-w-[980px] border-collapse text-left text-[12px]">
               <thead><tr className="border-b border-line font-mono text-[10px] uppercase tracking-wider text-ink3">{["Metric", "Median", "Typical range", "Tier · market · year", "Reliability", "Your benchmark (median / low / high)"].map((h) => <th key={h} className="px-2 py-2.5 font-medium">{h}</th>)}</tr></thead>

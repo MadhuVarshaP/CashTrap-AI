@@ -5,6 +5,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { AlertTriangle, ArrowUpDown, CheckCircle2, Download, History, Loader2, Play, Search, Database, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useMemo, useState } from "react";
+import { IndustryProfile, type ProfileDraft } from "@/components/risk/IndustryProfile";
 import { Dropzone } from "@/components/shared/Dropzone";
 import { Bar, Button, Card, CardHead, Pill } from "@/components/shared/ui";
 import { analyze } from "@/lib/calculations/analyze";
@@ -30,6 +31,8 @@ export default function CompanyAnalysis() {
   const { active, hasCompany, loadDemo, datasets, notify, addDataset, updateDataset, setActive, deleteDataset, history, removeHistory, clearHistory, runAnalysis, status, error, analysis, toast } = useApp();
   const [confirmDel, setConfirmDel] = useState<string | null>(null);
   const [q, setQ] = useState("");
+  // chosen before the file is read; applied to the company the moment it is uploaded
+  const [draft, setDraft] = useState<ProfileDraft>({ currency: "AED", frequency: "Annual" });
   const [sort, setSort] = useState<{ k: keyof FinancialRecord; dir: 1 | -1 }>({ k: "year", dir: 1 });
   const dq = dataQuality(active.records);
 
@@ -60,11 +63,12 @@ export default function CompanyAnalysis() {
   return (
     <>
 
+      <IndustryProfile draft={hasCompany ? undefined : { value: draft, set: setDraft }} />
       <div className="grid gap-5 xl:grid-cols-12">
         <Card className={hasCompany ? "xl:col-span-7" : "xl:col-span-12"}>
           <CardHead title="Upload financial records" hint="Columns are matched by name; common aliases (Sales, OCF, Total Debt…) are recognised. Blank cells are treated as missing, never zero." />
           <Dropzone onError={(errs, file) => notify({ title: `Couldn't read ${file.name}`, body: errs[0], tone: "crit" })} onParsed={(records, file, meta, warns) => {
-            addDataset({ id: `upload-${Date.now()}`, name: meta?.name ?? file.name.replace(/\.[^.]+$/, ""), industry: "Uploaded company", synthetic: !!meta?.synthetic, records, unitMultiplier: meta?.unitMultiplier ?? 1_000_000, fileName: file.name, fileSize: file.size, fileCurrency: meta?.currency, inputs: meta?.currency ? { currency: meta.currency, frequency: "Annual" } : { currency: "AED", frequency: "Annual" } });
+            addDataset({ id: `upload-${Date.now()}`, name: draft.name || (meta?.name ?? file.name.replace(/\.[^.]+$/, "")), industry: "Uploaded company", synthetic: !!meta?.synthetic, records, unitMultiplier: meta?.unitMultiplier ?? 1_000_000, fileName: file.name, fileSize: file.size, fileCurrency: meta?.currency, inputs: { industry: draft.industry, subIndustry: draft.subIndustry, currency: draft.currency ?? meta?.currency ?? "AED", frequency: draft.frequency ?? "Annual" } });
             notify({ title: `Uploaded ${meta?.name ?? file.name}`, body: `${records.length} years loaded${warns?.length ? ` · ${warns.length} data warning${warns.length > 1 ? "s" : ""}` : ""}. Run the analysis next.`, tone: warns?.length ? "warn" : "pos", href: "/company-analysis" });
           }} />
           <div className="mt-4 flex flex-wrap items-center gap-3">
@@ -87,7 +91,7 @@ export default function CompanyAnalysis() {
                 <div key={l} className="rounded-xl border border-line bg-bg2 p-3"><div className="font-mono text-[10px] uppercase text-ink3">{l}</div><div className="mt-1 font-display text-[24px] font-semibold tabular-nums">{v}</div></div>
               ))}
             </div>
-            <Bar value={dq.completeness * 100} max={100} color={dq.completeness === 1 ? "#35C994" : "#F5A640"} className="mt-4" />
+            <Bar value={dq.completeness * 100} max={100} color={dq.completeness === 1 ? "#10B981" : "#F59E0B"} className="mt-4" />
             <ul className="mt-4 space-y-2">
               {issues.filter((i) => i.level === "error").map((i) => <li key={i.text} className="flex gap-2 text-[12.5px] text-crit"><AlertTriangle size={14} className="mt-0.5 shrink-0" />{i.text}</li>)}
               {issues.filter((i) => i.level === "warning").map((i) => <li key={i.text} className="flex gap-2 text-[12.5px] text-warn"><AlertTriangle size={14} className="mt-0.5 shrink-0" />{i.text}</li>)}

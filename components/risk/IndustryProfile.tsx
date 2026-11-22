@@ -20,15 +20,18 @@ const Field = ({ label, children, hint }: { label: string; children: React.React
 );
 
 /** the target company's profile. The industry chosen here drives the benchmarks, thresholds and which indicators apply. */
-export function IndustryProfile({ onChanged }: { onChanged?: () => void }) {
+export interface ProfileDraft { industry?: string; subIndustry?: string; currency?: string; frequency?: string; name?: string }
+
+export function IndustryProfile({ onChanged, draft }: { onChanged?: () => void; draft?: { value: ProfileDraft; set: (d: ProfileDraft) => void } }) {
   const { active, updateInputs, updateDataset } = useApp();
-  const i = active.inputs ?? {};
+  const i: ProfileDraft = draft ? draft.value : active.inputs ?? {};
   const def = industryById(i.industry);
-  const period = useMemo(() => { const ys = active.records.map((r) => r.year); return ys.length ? `FY${Math.min(...ys)} to FY${Math.max(...ys)}` : "—"; }, [active.records]);
-  const change = (patch: Parameters<typeof updateInputs>[0]) => { updateInputs(patch); onChanged?.(); };
+  const period = useMemo(() => {
+    if (draft) return "Read from the uploaded file"; const ys = active.records.map((r) => r.year); return ys.length ? `FY${Math.min(...ys)} to FY${Math.max(...ys)}` : "—"; }, [active.records, draft]);
+  const change = (patch: ProfileDraft & Parameters<typeof updateInputs>[0]) => { if (draft) draft.set({ ...draft.value, ...patch }); else { updateInputs(patch); onChanged?.(); } };
   return (
     <Card hover={false} className="mb-6 !border-accent/30">
-      <CardHead icon={<Building2 size={17} className="text-accent" />} title="Target company profile" hint="Choose the target's industry before assessing risk. It selects the benchmarks, changes the scoring thresholds and decides which indicators apply." right={def ? <Pill tone="accent">{def.name}</Pill> : <Pill tone="warn">No industry selected</Pill>} />
+      <CardHead icon={<Building2 size={17} className="text-accent" />} title="Target company profile" hint="Choose the target's industry when you upload. It selects the benchmarks, changes the scoring thresholds and decides which indicators apply. You can change it any time." right={def ? <Pill tone="accent">{def.name}</Pill> : <Pill tone="warn">No industry selected</Pill>} />
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         <Field label="Select Target Company Industry">
           <select aria-label="Select Target Company Industry" value={i.industry ?? ""} className={sel} onChange={(e) => change({ industry: e.target.value || undefined, subIndustry: undefined, thresholds: {} })}>
@@ -43,9 +46,9 @@ export function IndustryProfile({ onChanged }: { onChanged?: () => void }) {
           </select>
         </Field>
         <Field label="Company name">
-          <input aria-label="Company name" defaultValue={active.name} key={active.id + active.name} onBlur={(e) => { const v = e.target.value.trim(); if (v && v !== active.name) updateDataset({ ...active, name: v }); }} onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()} className={sel} />
+          <input aria-label="Company name" defaultValue={draft ? draft.value.name ?? "" : active.name} placeholder={draft ? "Read from the file if left blank" : undefined} key={draft ? "draft" : active.id + active.name} onBlur={(e) => { const v = e.target.value.trim(); if (draft) { draft.set({ ...draft.value, name: v || undefined }); return; } if (v && v !== active.name) updateDataset({ ...active, name: v }); }} onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()} className={sel} />
         </Field>
-        <Field label="Reporting currency" hint={active.fileCurrency && active.fileCurrency !== (i.currency ?? "AED") ? `The file states ${active.fileCurrency}: figures are labelled as selected, not converted.` : "Labels only: no currency conversion is applied."}>
+        <Field label="Reporting currency" hint={!draft && active.fileCurrency && active.fileCurrency !== (i.currency ?? "AED") ? `The file states ${active.fileCurrency}: figures are labelled as selected, not converted.` : "Labels only: no currency conversion is applied."}>
           <select aria-label="Reporting currency" value={i.currency ?? "AED"} className={sel} onChange={(e) => change({ currency: e.target.value })}>{CURRENCIES.map((c) => <option key={c}>{c}</option>)}</select>
         </Field>
         <Field label="Financial reporting period" hint="Read from the uploaded years.">
