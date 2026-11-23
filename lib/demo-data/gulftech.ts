@@ -4,10 +4,10 @@ import type { Dataset } from "@/types/finance";
 export const GULFTECH: Dataset = {
   id: "gulftech-demo",
   name: "GulfTech Manufacturing LLC",
-  industry: "Industrial Manufacturing · Dubai, UAE",
+  industry: "Information Technology and Software · Dubai, UAE",
   synthetic: true,
   unitMultiplier: 1_000_000,
-  inputs: { industry: "manufacturing", currency: "AED", frequency: "Annual" },
+  inputs: { industry: "Information Technology and Software", currency: "AED", frequency: "Annual" },
   records: [
     { year: 2023, revenue: 412, cogs: 289, ebitda: 62, receivables: 58, inventory: 52, payables: 41, operatingCashFlow: 49, cash: 38, debt: 142, capex: 30, interestExpense: 11, currentAssets: 156, currentLiabilities: 123, principalRepayment: 14, shortTermDebt: 60, cashTaxes: 6 },
     { year: 2024, revenue: 448, cogs: 316, ebitda: 71, receivables: 84, inventory: 71, payables: 44, operatingCashFlow: 38, cash: 31, debt: 168, capex: 38, interestExpense: 13.5, currentAssets: 196, currentLiabilities: 145, principalRepayment: 15, shortTermDebt: 76, cashTaxes: 7 },
